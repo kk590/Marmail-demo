@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MarMail — AI Multi-Agent Email Marketing on Amazon Bedrock AgentCore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0B1220; --bg-deep:#060E20; --surface:#101A30; --surface-2:#16223C; --surface-3:#1C2A47;
+  --line:rgba(0,212,255,.14); --line-soft:rgba(148,163,184,.12);
+  --text:#E6EDF7; --text-2:#9FB0C7; --text-3:#64748B;
+  --cyan:#00D4FF; --cyan-dim:rgba(0,212,255,.12); --purple:#8B5CF6; --purple-dim:rgba(139,92,246,.14);
+  --teal:#10B981; --teal-dim:rgba(16,185,129,.12); --amber:#F59E0B; --amber-dim:rgba(245,158,11,.12);
+  --red:#EF4444; --red-dim:rgba(239,68,68,.12);
+  --r-sm:10px; --r-md:14px; --r-lg:18px;
+  --font:'Inter',system-ui,-apple-system,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(900px 500px at 15% -10%,rgba(0,212,255,.07),transparent 60%),
+             radial-gradient(800px 500px at 90% 0%,rgba(139,92,246,.08),transparent 60%),
+             radial-gradient(700px 600px at 50% 110%,rgba(16,185,129,.04),transparent 60%)}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#22314E;border-radius:8px}
+::-webkit-scrollbar-thumb:hover{background:#2E4066}
+::selection{background:rgba(0,212,255,.25)}
+a{color:var(--cyan);text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;color:var(--text);background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:9px 12px;font-size:13px;outline:none;transition:border-color .2s,box-shadow .2s}
+input:focus,select:focus,textarea:focus{border-color:rgba(0,212,255,.5);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
+select option{background:var(--surface-2)}
+.mono{font-family:var(--mono)}
+
+/* ============ LAYOUT ============ */
+#app{display:flex;height:100vh;position:relative;z-index:1}
+.sidebar{width:236px;flex-shrink:0;background:rgba(9,15,29,.85);backdrop-filter:blur(12px);border-right:1px solid var(--line-soft);display:flex;flex-direction:column;transition:width .25s ease;z-index:30}
+.sidebar.collapsed{width:68px}
+.side-logo{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid var(--line-soft);min-height:64px}
+.side-logo svg{flex-shrink:0}
+.side-logo .brand-txt{white-space:nowrap;overflow:hidden;transition:opacity .2s}
+.sidebar.collapsed .brand-txt{opacity:0;width:0}
+.nav{flex:1;padding:14px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:var(--r-sm);color:var(--text-2);font-weight:500;font-size:13.5px;transition:all .18s;position:relative;white-space:nowrap}
+.nav-item svg{flex-shrink:0;width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.nav-item:hover{color:var(--text);background:rgba(148,163,184,.07)}
+.nav-item.active{color:var(--cyan);background:var(--cyan-dim)}
+.nav-item.active::before{content:'';position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:3px;background:var(--cyan);box-shadow:0 0 12px var(--cyan)}
+.nav-item .nav-badge{margin-left:auto;background:var(--purple-dim);color:#C4B5FD;font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:99px}
+.sidebar.collapsed .nav-item span,.sidebar.collapsed .nav-badge{display:none}
+.side-foot{padding:12px;border-top:1px solid var(--line-soft)}
+.collapse-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:8px;border-radius:var(--r-sm);color:var(--text-3);font-size:12px}
+.collapse-btn:hover{background:rgba(148,163,184,.07);color:var(--text-2)}
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.header{height:64px;flex-shrink:0;display:flex;align-items:center;gap:14px;padding:0 22px;border-bottom:1px solid var(--line-soft);background:rgba(11,18,32,.7);backdrop-filter:blur(12px)}
+.search-wrap{position:relative;width:340px;max-width:34%}
+.search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--text-3);fill:none;stroke-width:2}
+.search-wrap input{width:100%;padding-left:36px;background:rgba(148,163,184,.06);border-color:transparent}
+.search-wrap input::placeholder{color:var(--text-3)}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.icon-btn{position:relative;width:36px;height:36px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;color:var(--text-2);border:1px solid transparent;transition:all .18s}
+.icon-btn:hover{background:rgba(148,163,184,.08);color:var(--text)}
+.icon-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.notif-dot{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red)}
+.avatar{width:34px;height:34px;border-radius:50%;border:2px solid rgba(0,212,255,.4);object-fit:cover}
+.user-meta{display:flex;flex-direction:column;line-height:1.25}
+.user-meta b{font-size:12.5px;font-weight:600}
+.user-meta span{font-size:11px;color:var(--text-3)}
+.content{flex:1;overflow-y:auto;padding:26px 28px 0;scroll-behavior:smooth}
+.footer{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:12px 28px;border-top:1px solid var(--line-soft);font-size:11.5px;color:var(--text-3)}
+.health-pill{display:flex;align-items:center;gap:7px;padding:4px 12px;border-radius:99px;background:var(--teal-dim);color:var(--teal);font-weight:600;font-size:11px}
+.pulse-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1.8s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.8)}}
+
+/* ============ COMPONENTS ============ */
+.btn{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:13px;border-radius:var(--r-sm);padding:9px 16px;transition:all .18s;border:1px solid transparent}
+.btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn-primary{background:linear-gradient(135deg,#00D4FF,#00A8FF);color:#04121E;box-shadow:0 4px 20px rgba(0,212,255,.3)}
+.btn-primary:hover{box-shadow:0 6px 26px rgba(0,212,255,.45);transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.btn-ghost{border-color:var(--line-soft);color:var(--text-2)}
+.btn-ghost:hover{color:var(--text);border-color:rgba(148,163,184,.3);background:rgba(148,163,184,.06)}
+.btn-danger{background:var(--red-dim);color:var(--red)}
+.card{background:linear-gradient(160deg,rgba(22,34,60,.55),rgba(16,26,48,.55));border:1px solid var(--line-soft);border-radius:var(--r-lg);backdrop-filter:blur(8px);position:relative}
+.card.glow{border-color:rgba(0,212,255,.28);box-shadow:0 0 0 1px rgba(0,212,255,.08),0 8px 40px -12px rgba(0,212,255,.18)}
+.card-pad{padding:20px 22px}
+.card-title{font-size:13px;font-weight:700;letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.card-title svg{width:15px;height:15px;stroke:var(--cyan);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;letter-spacing:.01em}
+.chip .cdot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.chip-teal{background:var(--teal-dim);color:var(--teal)}
+.chip-cyan{background:var(--cyan-dim);color:var(--cyan)}
+.chip-purple{background:var(--purple-dim);color:#C4B5FD}
+.chip-amber{background:var(--amber-dim);color:var(--amber)}
+.chip-red{background:var(--red-dim);color:var(--red)}
+.chip-gray{background:rgba(148,163,184,.12);color:var(--text-2)}
+table.data{width:100%;border-collapse:collapse;font-size:13px}
+table.data th{text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);padding:10px 14px;border-bottom:1px solid var(--line-soft)}
+table.data td{padding:12px 14px;border-bottom:1px solid rgba(148,163,184,.06)}
+table.data tbody tr{transition:background .15s}
+table.data tbody tr:hover{background:rgba(0,212,255,.03)}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px}
+.field{margin-bottom:16px}
+.hint{font-size:11.5px;color:var(--text-3);margin-top:5px}
+.range-wrap{display:flex;align-items:center;gap:12px}
+input[type=range]{-webkit-appearance:none;flex:1;height:5px;border-radius:5px;background:linear-gradient(90deg,var(--cyan) var(--fill,50%),#22314E var(--fill,50%));padding:0;border:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--cyan);box-shadow:0 0 10px rgba(0,212,255,.5);cursor:pointer}
+.range-val{font-family:var(--mono);font-size:13px;color:var(--cyan);min-width:34px;text-align:right;font-weight:600}
+.chip-select{display:flex;flex-wrap:wrap;gap:7px}
+.sel-chip{padding:6px 13px;border-radius:99px;border:1px solid var(--line-soft);font-size:12px;font-weight:500;color:var(--text-2);transition:all .15s;background:rgba(148,163,184,.04)}
+.sel-chip:hover{border-color:rgba(0,212,255,.4);color:var(--text)}
+.sel-chip.on{background:var(--cyan-dim);border-color:rgba(0,212,255,.55);color:var(--cyan);box-shadow:0 0 12px rgba(0,212,255,.15)}
+.seg{display:flex;background:var(--bg-deep);border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:3px;gap:3px}
+.seg button{padding:6px 14px;border-radius:7px;font-size:12px;font-weight:600;color:var(--text-3)}
+.seg button.on{background:var(--surface-3);color:var(--text)}
+/* stepper */
+.stepper{display:flex;align-items:center;gap:0;margin-bottom:24px}
+.step{display:flex;align-items:center;gap:10px}
+.step .s-dot{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;border:2px solid var(--line-soft);color:var(--text-3);background:var(--surface);transition:all .3s;flex-shrink:0}
+.step .s-label{font-size:13px;font-weight:600;color:var(--text-3);white-space:nowrap}
+.step.done .s-dot{background:var(--teal-dim);border-color:var(--teal);color:var(--teal)}
+.step.done .s-label{color:var(--teal)}
+.step.now .s-dot{background:var(--cyan-dim);border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 16px rgba(0,212,255,.35)}
+.step.now .s-label{color:var(--text)}
+.step-bar{width:56px;height:2px;background:var(--line-soft);margin:0 12px;position:relative;overflow:hidden;border-radius:2px}
+.step-bar i{position:absolute;inset:0;background:var(--teal);transform:scaleX(0);transform-origin:left;transition:transform .4s ease}
+.step-bar.fill i{transform:scaleX(1)}
+/* agent node */
+.agent-node{background:linear-gradient(160deg,rgba(22,34,60,.7),rgba(14,22,40,.7));border:1px solid var(--line-soft);border-radius:var(--r-md);padding:14px 16px;position:relative;transition:all .3s;backdrop-filter:blur(6px)}
+.agent-node .an-head{display:flex;align-items:center;gap:9px;margin-bottom:6px}
+.ai-orb{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative}
+.ai-orb svg{width:14px;height:14px}
+.orb-cyan{background:var(--cyan-dim);color:var(--cyan)}
+.orb-purple{background:var(--purple-dim);color:#C4B5FD}
+.orb-teal{background:var(--teal-dim);color:var(--teal)}
+.orb-amber{background:var(--amber-dim);color:var(--amber)}
+.agent-node.running{border-color:rgba(0,212,255,.55);box-shadow:0 0 24px -4px rgba(0,212,255,.35),inset 0 0 20px rgba(0,212,255,.04)}
+.agent-node.running .ai-orb::after{content:'';position:absolute;inset:-4px;border-radius:11px;border:1.5px solid rgba(0,212,255,.5);animation:ringPulse 1.4s ease-out infinite}
+@keyframes ringPulse{0%{transform:scale(.85);opacity:1}100%{transform:scale(1.25);opacity:0}}
+.agent-node.success{border-color:rgba(16,185,129,.45)}
+.agent-node.failed{border-color:rgba(239,68,68,.5)}
+.spinner{width:13px;height:13px;border-radius:50%;border:2px solid rgba(0,212,255,.2);border-top-color:var(--cyan);animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* logs */
+.log-panel{font-family:var(--mono);font-size:11.5px;line-height:1.85;padding:16px 18px;overflow-y:auto;flex:1}
+.log-line{display:flex;gap:10px;opacity:0;animation:logIn .3s forwards}
+@keyframes logIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.log-ts{color:var(--text-3);flex-shrink:0}
+.lg-info{color:#8FB8D8}.lg-agent{color:var(--cyan)}.lg-crit{color:#C4B5FD}.lg-ok{color:var(--teal)}.lg-warn{color:var(--amber)}.lg-err{color:var(--red)}.lg-tok{color:#7DD3FC}
+/* toast */
+#toasts{position:fixed;bottom:24px;right:24px;z-index:200;display:flex;flex-direction:column;gap:10px}
+.toast{display:flex;align-items:center;gap:11px;background:var(--surface-2);border:1px solid var(--line-soft);border-left:3px solid var(--cyan);border-radius:var(--r-md);padding:12px 16px;min-width:300px;box-shadow:0 12px 40px rgba(0,0,0,.5);animation:toastIn .35s cubic-bezier(.2,.9,.3,1.2);font-size:13px}
+.toast.ok{border-left-color:var(--teal)}
+.toast.err{border-left-color:var(--red)}
+@keyframes toastIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+.toast.out{animation:toastOut .3s forwards}
+@keyframes toastOut{to{opacity:0;transform:translateX(40px)}}
+/* modal */
+.modal-bg{position:fixed;inset:0;background:rgba(4,8,18,.7);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;animation:fadeIn .2s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);width:560px;max-width:92vw;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.6);animation:modalIn .3s cubic-bezier(.2,.9,.3,1.1)}
+@keyframes modalIn{from{opacity:0;transform:scale(.94) translateY(12px)}to{opacity:1;transform:none}}
+.metric-num{font-size:27px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.spark{display:block}
+.empty-state{text-align:center;padding:52px 20px;color:var(--text-3)}
+.empty-state svg{width:44px;height:44px;stroke:var(--text-3);fill:none;stroke-width:1.4;margin-bottom:14px;opacity:.7}
+.kv{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px dashed rgba(148,163,184,.1);font-size:13px}
+.kv:last-child{border-bottom:none}
+.kv b{font-weight:600;font-variant-numeric:tabular-nums}
+.progress{height:6px;border-radius:6px;background:#1B2942;overflow:hidden}
+.progress i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--cyan),var(--purple));transition:width .5s ease;box-shadow:0 0 10px rgba(0,212,255,.4)}
+.dropdown{position:absolute;top:44px;right:0;width:320px;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r-md);box-shadow:0 18px 50px rgba(0,0,0,.55);z-index:60;overflow:hidden;animation:modalIn .2s}
+.notif-item{padding:12px 15px;border-bottom:1px solid rgba(148,163,184,.07);font-size:12.5px;display:flex;gap:10px;align-items:flex-start}
+.notif-item:hover{background:rgba(148,163,184,.05)}
+.notif-item .nd{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.fade-up{animation:fadeUp .45s cubic-bezier(.2,.8,.3,1) both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.stagger>*{animation:fadeUp .45s cubic-bezier(.2,.8,.3,1) both}
+.stagger>*:nth-child(1){animation-delay:.02s}.stagger>*:nth-child(2){animation-delay:.06s}.stagger>*:nth-child(3){animation-delay:.1s}.stagger>*:nth-child(4){animation-delay:.14s}.stagger>*:nth-child(5){animation-delay:.18s}.stagger>*:nth-child(6){animation-delay:.22s}
+.grid-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap}
+.page-title{font-size:21px;font-weight:800;letter-spacing:-.02em}
+.page-sub{font-size:13px;color:var(--text-2);margin-top:3px}
+.tooltip{position:relative}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main">
+    <header class="header" id="header"></header>
+    <main class="content" id="view"></main>
+    <footer class="footer" id="footer"></footer>
+  </div>
+</div>
+<div id="toasts"></div>
+<div id="modal-root"></div>
+<script>
+const Backend = (() => {
+  const DB_KEY = 'marmail_db_v3';
+  const listeners = {}; // event bus
+  const on = (ev, fn) => { (listeners[ev] = listeners[ev] || []).push(fn); return () => { listeners[ev] = listeners[ev].filter(f => f !== fn); }; };
+  const emit = (ev, data) => (listeners[ev] || []).forEach(fn => { try { fn(data); } catch (e) { console.error(e); } });
+  const latency = (ms) => new Promise(r => setTimeout(r, ms + Math.random() * 120));
+  const uid = (p) => p + '_' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  const now = () => Date.now();
+  const ago = (mins) => now() - mins * 60000;
+
+  /* ---------- data pools for procedural generation ---------- */
+  const FIRST = ['Elena','Marcus','Priya','David','Sofia','James','Aisha','Tom','Nina','Oliver','Grace','Leo','Maya','Ethan','Isla','Noah','Zara','Lucas','Ivy','Henry','Ruby','Felix','Chloe','Omar','Lena','Victor','Anya','Julian','Tessa','Ravi','Mira','Kai','Freya','Diego','Hana','Theo','Ingrid','Sam','Lara','Owen'];
+  const LAST = ['Vasquez','Chen','Sharma','Okafor','Lindqvist','Moreau','Tanaka','Novak','Silva','Kim','Haddad','Fischer','Rossi','Nakamura','Bergström','Dubois','Mehta','Petrov','Kowalski','Nguyen','Alvarez','Fitzgerald','Osei','Larsen','Romano','Weber','Costa','Ivanov','Sato','Mendes','Haas','Verma','Bakker','Klein','Santos','Reyes','Marek','Lund','Adeyemi','Brooks'];
+  const COMPANIES = { 'SaaS / Software': ['NimbusIQ','Flowstack','Quantiva','Brightloom','Hexafold','Cloudhaven','Dataweave','Kitebase','Stratosly','Vektorly','Pulsegrid','Orbitlane'], 'Fintech': ['Ledgerly','Paystride','Vaultora','Finchpay','Clearcoin','Trustline','Meridian Pay'], 'Healthcare Tech': ['Medlyra','Carepointe','Vitalsync','Healthgrid','Neurospark'], 'E-commerce': ['Cartloop','Vendora','Shopwire','Mergely','Parcelpay'], 'AI / ML': ['Synthmind','Neuralis','Promptbase','Cognivia','Latentspace'], 'DevTools': ['Gitstream','Deploykit','Apipulse','Containerly','Buildhive'] };
+  const DOMAINS = { 'SaaS / Software':'io','Fintech':'com','Healthcare Tech':'health','E-commerce':'shop','AI / ML':'ai','DevTools':'dev' };
+  const TITLE_BY = { 'VP Engineering': ['VP Engineering','VP of Engineering','Head of Engineering','Director of Engineering'], 'CTO': ['CTO','Chief Technology Officer'], 'Head of Growth': ['Head of Growth','VP Growth','Director of Growth Marketing'], 'CPO': ['CPO','Chief Product Officer'], 'Engineering Manager': ['Engineering Manager','Senior Engineering Manager','Platform Lead'] };
+  const SIZE_LABEL = { '1-50':'Startup (1–50)', '51-200':'Growth (51–200)', '201-1000':'Scale-up (201–1k)', '1000+':'Enterprise (1k+)' };
+  const LOCS = ['San Francisco, US','New York, US','Austin, US','London, UK','Berlin, DE','Amsterdam, NL','Toronto, CA','Singapore','Sydney, AU','Bangalore, IN','Tel Aviv, IL','Stockholm, SE','Paris, FR','Dublin, IE'];
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const rand = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
+
+  function genLead(criteria, source, status, fetchedAt) {
+    const f = pick(FIRST), l = pick(LAST);
+    const comp = pick(COMPANIES[criteria.industry] || COMPANIES['SaaS / Software']);
+    const domain = DOMAINS[criteria.industry] || 'io';
+    return {
+      id: uid('LD'), name: f + ' ' + l,
+      email: (f + '.' + l).toLowerCase().replace(/[^a-z.]/g, '') + '@' + comp.toLowerCase().replace(/[^a-z]/g, '') + '.' + domain,
+      title: pick(TITLE_BY[criteria.jobTitle] || ['VP Engineering']),
+      company: comp, companySize: criteria.companySize,
+      location: criteria.location, source,
+      status: status || pick(['New','Qualified','Contacted','New','Qualified']),
+      fetchedAt, deduped: false, validation: Math.random() > .12 ? 'Valid' : 'Risky'
+    };
+  }
+
+  /* ---------- seed database ---------- */
+  function seed() {
+    const t = now();
+    const c1crit = { industry: 'SaaS / Software', companySize: '51-200', location: 'San Francisco, US', jobTitle: 'VP Engineering', maxLeads: 120 };
+    const c2crit = { industry: 'Fintech', companySize: '201-1000', location: 'New York, US', jobTitle: 'CTO', maxLeads: 80 };
+    const c3crit = { industry: 'AI / ML', companySize: '1-50', location: 'London, UK', jobTitle: 'Head of Growth', maxLeads: 60 };
+    const leads = [];
+    for (let i = 0; i < 46; i++) leads.push(genLead(c1crit, 'Apollo Graph', i < 30 ? 'Contacted' : 'Qualified', ago(rand(40, 3000))));
+    for (let i = 0; i < 24; i++) leads.push(genLead(c2crit, 'BuiltWith Scan', i < 12 ? 'Contacted' : 'New', ago(rand(20, 1500))));
+    for (let i = 0; i < 18; i++) leads.push(genLead(c3crit, 'Web Crawl', 'New', ago(rand(5, 700))));
+    leads.forEach((l, i) => { if (i % 11 === 0) { l.deduped = true; } });
+
+    const camp = (id, name, crit, status, sent, opened, clicked, bounced, failed, cost, startedMin, template) => ({
+      id, name, criteria: crit, template, status,
+      stats: { fetched: sent + bounced + failed + rand(0, 8), sent, opened, clicked, bounced, failed },
+      cost: { usd: cost, tokens: Math.round(cost * 8200) }, createdAt: ago(startedMin), startedAt: ago(startedMin - 5)
+    });
+    const campaigns = [
+      camp('CMP_Q3EXP', 'Q3 Expansion — VP Eng SaaS', c1crit, 'Completed', 112, 61, 23, 4, 2, 14.62, 3400, 'outreach_a'),
+      camp('CMP_FINT', 'Fintech CTO Outreach Wave', c2crit, 'Completed', 71, 38, 14, 3, 1, 9.87, 1700, 'outreach_b'),
+      camp('CMP_AIGR', 'AI Startup Growth Blitz', c3crit, 'Sending', 34, 12, 4, 1, 0, 5.31, 120, 'outreach_a'),
+      camp('CMP_DRAFT1', 'DevTools EM Nurture (draft)', { industry: 'DevTools', companySize: '201-1000', location: 'Berlin, DE', jobTitle: 'Engineering Manager', maxLeads: 90 }, 'Draft', 0, 0, 0, 0, 0, 0, 60, 'outreach_b'),
+      camp('CMP_DRAFT2', 'Healthcare Tech Pilot', { industry: 'Healthcare Tech', companySize: '1000+', location: 'Toronto, CA', jobTitle: 'CPO', maxLeads: 40 }, 'Draft', 0, 0, 0, 0, 0, 0, 30, 'outreach_a')
+    ];
+    return {
+      seq: 1042,
+      campaigns, leads,
+      agents: [
+        { id: 'AG_SEQ', name: 'Sequence Agent', role: 'Orchestrates the full pipeline — decomposes goals, routes work, aggregates results from all worker agents.', model: 'Claude 3.7 Sonnet', status: 'Active', lastActivity: '2 min ago', runs: 128, success: 98.4 },
+        { id: 'AG_LEAD', name: 'LeadGen Agent', role: 'Searches Apollo, LinkedIn & web crawls to discover and enrich ICP-matched leads.', model: 'Claude 3.5 Sonnet', status: 'Active', lastActivity: '2 min ago', runs: 342, success: 96.1 },
+        { id: 'AG_CRIT', name: 'LeadGen Critique Agent', role: 'Adversarial reviewer — validates lead quality, flags off-ICP records, issues PASS / FAIL verdicts.', model: 'Claude 3.5 Haiku', status: 'Active', lastActivity: '3 min ago', runs: 342, success: 91.7 },
+        { id: 'AG_DB', name: 'DB Agent', role: 'Writes validated leads to the Aurora cluster, dedupes against existing records, validates email syntax.', model: 'Claude 3.5 Haiku', status: 'Active', lastActivity: '4 min ago', runs: 318, success: 99.2 },
+        { id: 'AG_EMAIL', name: 'Email Agent', role: 'Personalizes copy per-lead via Bedrock, manages throttled SES dispatch and tracks delivery events.', model: 'Claude 3.7 Sonnet', status: 'Active', lastActivity: '1 min ago', runs: 205, success: 97.8 },
+        { id: 'AG_LOOP', name: 'Loop Agent', role: 'Failure recovery specialist — re-queues failed subtasks, escalates after 3 retries, keeps the graph converging.', model: 'Claude 3.5 Haiku', status: 'Standby', lastActivity: '12 min ago', runs: 57, success: 88.3 }
+      ],
+      notifications: [
+        { id: uid('N'), type: 'ok', text: 'Campaign "AI Startup Growth Blitz" sent batch 3/4 — 34 emails delivered.', at: ago(6) },
+        { id: uid('N'), type: 'warn', text: 'LeadGen Critique flagged 3 off-ICP records in CMP_AIGR — Loop Agent re-queued.', at: ago(18) },
+        { id: uid('N'), type: 'info', text: 'Bedrock AgentCore runtime scaled to 6 concurrent agent sessions.', at: ago(47) },
+        { id: uid('N'), type: 'err', text: '2 SES bounces detected in CMP_FINT — suppression list updated.', at: ago(140) }
+      ],
+      templates: [
+        { id: 'outreach_a', name: 'Warm Intro — Pain-Led', subject: 'Scaling {{company}}\'s pipeline without growing headcount', body: 'Hi {{first_name}},\n\nNoticed {{company}} is hiring aggressively on the engineering side — usually a sign the GTM stack is feeling the strain.\n\nWe help teams like yours automate outbound with AI agents that research, personalize and send at scale (currently 3.2x reply rates vs. static sequences).\n\nWorth a 15-minute look at how this would map to {{company}}\'s stack?\n\nBest,\nJordan Avery\nVP Growth, MarMail' },
+        { id: 'outreach_b', name: 'Direct Value — Metric First', subject: '{{first_name}}, how {{company}} can cut CAC 40% this quarter', body: 'Hi {{first_name}},\n\nTeams at {{company_size}}-person {{industry}} companies typically spend 20+ hrs/week on manual prospecting.\n\nMarMail\'s AgentCore fleet handles research, enrichment and personalized sends end-to-end — most customers see replies within 48 hours of launch.\n\nOpen to a quick benchmark for {{company}}?\n\nCheers,\nJordan Avery\nVP Growth, MarMail' }
+      ],
+      runs: {} // active run state per campaign
+    };
+  }
+
+  let db;
+  try { db = JSON.parse(localStorage.getItem(DB_KEY)); } catch (e) { db = null; }
+  if (!db || !db.campaigns) { db = seed(); persist(); }
+  function persist() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {} }
+
+  /* ---------- helpers ---------- */
+  const campaignById = (id) => db.campaigns.find(c => c.id === id);
+  const money = (n) => '$' + n.toFixed(2);
+  const tok = (n) => n > 999 ? (n / 1000).toFixed(1) + 'k' : n;
+  const totals = () => db.campaigns.reduce((a, c) => ({ sent: a.sent + c.stats.sent, bounced: a.bounced + c.stats.bounced, failed: a.failed + c.stats.failed, cost: a.cost + c.cost.usd, tokens: a.tokens + c.cost.tokens, fetched: a.fetched + c.stats.fetched }), { sent: 0, bounced: 0, failed: 0, cost: 0, tokens: 0, fetched: 0 });
+
+  /* =====================================================================
+     AGENT ORCHESTRATION ENGINE — simulates the Bedrock AgentCore graph
+     ===================================================================== */
+  const TOKEN_RATE = { 'Claude 3.7 Sonnet': 0.000018, 'Claude 3.5 Sonnet': 0.000015, 'Claude 3.5 Haiku': 0.000004 };
+  const CRIT_FAIL_RATE = 0.16;
+
+  function log(run, level, msg, tokens) {
+    run.logs.push({ t: now(), level, msg, tokens: tokens || 0 });
+    run.tokens += tokens || 0;
+    run.cost += (tokens || 0) * 0.000008; // blended input+output
+    emit('run-log', { campaignId: run.campaignId, line: run.logs[run.logs.length - 1] });
+  }
+  const setPhase = (run, phase, nodeState) => {
+    run.phase = phase;
+    if (nodeState) run.nodes = Object.assign({}, run.nodes, nodeState);
+    emit('run-state', { campaignId: run.campaignId, run });
+  };
+
+  async function orchestrate(campaignId) {
+    const c = campaignById(campaignId);
+    const run = db.runs[campaignId] = {
+      campaignId, phase: 'queued', logs: [], tokens: 0, cost: 0, retries: { leadgen: 0, db: 0, email: 0 },
+      nodes: { seq: 'idle', leadgen: 'idle', leadgen_crit: 'idle', db: 'idle', db_crit: 'idle', email: 'idle', email_crit: 'idle', loop: 'idle' },
+      leadsTarget: c.criteria.maxLeads, leadsDone: 0, emailsDone: 0, verdicts: [], startedAt: now()
+    };
+    c.status = 'Running'; persist(); emit('db', { type: 'campaign', campaign: c });
+
+    const wait = (ms) => new Promise(r => setTimeout(r, ms));
+    const agent = (id) => db.agents.find(a => a.id === id);
+
+    await wait(700);
+    setPhase(run, 'sequence', { seq: 'running' });
+    log(run, 'agent', `▸ Sequence Agent initialized — goal: "${c.name}"`, 1400);
+    log(run, 'info', `Decomposing goal into 3 subtasks → LeadGen, DB, Email`, 900);
+    log(run, 'info', `Routing via Bedrock AgentCore Runtime · session ${campaignId.toLowerCase()}`, 0);
+    await wait(1400);
+    log(run, 'ok', `Plan approved. Spawning worker agents…`, 650);
+    setPhase(run, 'leadgen', { seq: 'success', leadgen: 'running' });
+    agent('AG_SEQ').lastActivity = 'just now';
+
+    /* ---- LeadGen module with Critique + Loop ---- */
+    let fetched = [], attempts = 0;
+    while (fetched.length < run.leadsTarget && attempts < 3) {
+      attempts++;
+      if (attempts > 1) { log(run, 'warn', `↻ Loop Agent re-queued LeadGen (attempt ${attempts}/3)`, 300); setPhase(run, 'leadgen', { leadgen_crit: 'idle', loop: 'running' }); await wait(900); setPhase(run, 'leadgen', { loop: 'idle', leadgen: 'running' }); }
+      const batchSize = Math.min(rand(28, 42), run.leadsTarget - fetched.length);
+      log(run, 'agent', `▸ LeadGen Agent querying Apollo + web crawl … targeting ${batchSize} leads`, 1100);
+      for (let b = 0; b < 4; b++) {
+        await wait(650);
+        const n = Math.min(Math.ceil(batchSize / 4), run.leadsTarget - fetched.length);
+        for (let i = 0; i < n; i++) fetched.push(genLead(c.criteria, pick(['Apollo Graph', 'Web Crawl', 'LinkedIn Export']), 'New', now()));
+        setPhase(run, 'leadgen', {});
+        emit('run-progress', { campaignId, module: 'leadgen', done: fetched.length, total: run.leadsTarget });
+        log(run, 'info', `  fetched +${n} records (${fetched.length}/${run.leadsTarget})`, 0);
+      }
+      setPhase(run, 'leadgen_crit', { leadgen: 'success', leadgen_crit: 'running' });
+      await wait(1000);
+      const offIcp = Math.round(batchSize * CRIT_FAIL_RATE * Math.random());
+      const verdict = offIcp > 4 ? 'FAIL' : 'PASS';
+      run.verdicts.push({ module: 'LeadGen', verdict, detail: offIcp + ' off-ICP records flagged' });
+      if (verdict === 'PASS') {
+        log(run, 'crit', `✔ LeadGen Critique: PASS — batch matches ICP (${offIcp} minor flags)`, 2400);
+      } else {
+        fetched = fetched.slice(0, fetched.length - offIcp);
+        log(run, 'crit', `✖ LeadGen Critique: FAIL — ${offIcp} off-ICP records removed`, 2400);
+        run.retries.leadgen++;
+      }
+      setPhase(run, 'leadgen_crit', { leadgen_crit: verdict === 'PASS' ? 'success' : 'failed' });
+      await wait(600);
+      if (verdict === 'PASS') break;
+    }
+    agent('AG_LEAD').lastActivity = 'just now'; agent('AG_CRIT').lastActivity = 'just now';
+    log(run, 'ok', `LeadGen module complete — ${fetched.length} leads in handoff buffer`, 500);
+
+    /* ---- DB module with Critique + Loop ---- */
+    setPhase(run, 'db', { db: 'running' });
+    log(run, 'agent', `▸ DB Agent connecting to Aurora PostgreSQL (cluster: marmail-prod)`, 800);
+    await wait(900);
+    let dupes = 0, written = 0;
+    for (let b = 0; b < 5; b++) {
+      await wait(620);
+      const slice = fetched.slice(Math.ceil(fetched.length * b / 5), Math.ceil(fetched.length * (b + 1) / 5));
+      slice.forEach(l => {
+        const isDupe = db.leads.some(x => x.email === l.email);
+        if (isDupe) { dupes++; l.deduped = true; }
+        l.status = 'New'; db.leads.unshift(l); written++;
+      });
+      persist();
+      emit('db', { type: 'leads' });
+      emit('run-progress', { campaignId, module: 'db', done: written, total: fetched.length });
+      log(run, 'info', `  upsert batch ${b + 1}/5 → ${slice.length} rows (${dupes} dupes suppressed)`, 0);
+    }
+    setPhase(run, 'db_crit', { db: 'success', db_crit: 'running' });
+    await wait(1100);
+    const invalid = fetched.filter(l => l.validation !== 'Valid').length;
+    const dbVerdict = invalid > 12 ? 'FAIL' : 'PASS';
+    run.verdicts.push({ module: 'DB', verdict: dbVerdict, detail: `${fetched.length - invalid} valid · ${invalid} risky · ${dupes} duplicates` });
+    log(run, 'crit', dbVerdict === 'PASS' ? `✔ DB Critique: PASS — schema valid, dedupe clean` : `✖ DB Critique: FAIL — ${invalid} risky emails quarantined`, 1900);
+    setPhase(run, 'db_crit', { db_crit: dbVerdict === 'PASS' ? 'success' : 'failed' });
+    if (dbVerdict === 'FAIL') { run.retries.db++; log(run, 'warn', `↻ Loop Agent quarantined ${invalid} records, proceeding with clean set`, 300); agent('AG_LOOP').lastActivity = 'just now'; }
+    await wait(700);
+    const sendable = fetched.filter(l => l.validation === 'Valid');
+    log(run, 'ok', `DB module complete — ${sendable.length} sendable leads (${dupes} duplicates removed)`, 400);
+    agent('AG_DB').lastActivity = 'just now';
+
+    /* ---- Email module with Critique + Loop ---- */
+    setPhase(run, 'email', { email: 'running' });
+    const tpl = db.templates.find(t => t.id === c.template) || db.templates[0];
+    log(run, 'agent', `▸ Email Agent loading template "${tpl.name}" · rendering via Bedrock`, 950);
+    await wait(900);
+    let sent = 0, bounced = 0, failed = 0;
+    const batches = Math.ceil(sendable.length / 12);
+    for (let b = 0; b < batches; b++) {
+      const slice = sendable.slice(b * 12, (b + 1) * 12);
+      await wait(720);
+      slice.forEach(l => {
+        const r = Math.random();
+        if (r < .045) bounced++; else if (r < .06) failed++; else sent++;
+      });
+      run.emailsDone += slice.length;
+      c.stats.sent += slice.filter(() => true).length - 0; // updated below on completion
+      setPhase(run, 'email', {});
+      emit('run-progress', { campaignId, module: 'email', done: run.emailsDone, total: sendable.length });
+      log(run, 'info', `  SES dispatch batch ${b + 1}/${batches} → ${slice.length} sent (throttle 14/s)`, 0);
+    }
+    setPhase(run, 'email_crit', { email: 'success', email_crit: 'running' });
+    await wait(1000);
+    const bounceRate = bounced / Math.max(1, sendable.length);
+    const emVerdict = bounceRate > .1 ? 'FAIL' : 'PASS';
+    run.verdicts.push({ module: 'Email', verdict: emVerdict, detail: `${sent} sent · ${bounced} bounced · ${failed} failed` });
+    log(run, 'crit', emVerdict === 'PASS' ? `✔ Email Critique: PASS — bounce rate ${(bounceRate * 100).toFixed(1)}% within threshold` : `✖ Email Critique: FAIL — bounce rate ${(bounceRate * 100).toFixed(1)}% above 10%`, 2100);
+    setPhase(run, 'email_crit', { email_crit: emVerdict === 'PASS' ? 'success' : 'failed' });
+    if (emVerdict === 'FAIL') { run.retries.email++; log(run, 'warn', `↻ Loop Agent engaged — pausing dispatch, warming domain reputation`, 350); agent('AG_LOOP').status = 'Active'; agent('AG_LOOP').lastActivity = 'just now'; await wait(1200); }
+
+    /* ---- finalize ---- */
+    c.stats.fetched += fetched.length; c.stats.sent += sent; c.stats.bounced += bounced; c.stats.failed += failed;
+    c.stats.opened += Math.round(sent * (.42 + Math.random() * .18));
+    c.stats.clicked += Math.round(sent * (.14 + Math.random() * .08));
+    c.cost.usd += run.cost; c.cost.tokens += run.tokens;
+    c.status = 'Completed'; c.completedAt = now();
+    persist();
+    setPhase(run, 'done', { loop: 'success' });
+    log(run, 'ok', `✔ Run complete — ${sent} sent / ${bounced} bounced / ${failed} failed · ${tok(run.tokens)} tokens · ${money(run.cost)}`, 700);
+    log(run, 'info', `Sequence Agent publishing results to Analytics store…`, 0);
+    db.notifications.unshift({ id: uid('N'), type: 'ok', text: `Campaign "${c.name}" completed — ${sent} emails sent for ${money(run.cost)}.`, at: now() });
+    emit('db', { type: 'campaign', campaign: c }); emit('run-done', { campaignId, run });
+    setTimeout(() => { agent('AG_LOOP').status = 'Standby'; persist(); emit('db', { type: 'agents' }); }, 8000);
+  }
+
+  /* ---------- public API (simulated REST) ---------- */
+  return {
+    on, emit, money, tok,
+    async getDashboard() { await latency(180); const t = totals(); return { campaigns: db.campaigns.length, fetched: db.leads.length + t.fetched, sent: t.sent, avgCost: db.campaigns.filter(c => c.cost.usd > 0).length ? t.cost / db.campaigns.filter(c => c.cost.usd > 0).length : 0, totals }; },
+    async getCampaigns() { await latency(160); return [...db.campaigns].sort((a, b) => b.createdAt - a.createdAt); },
+    async getCampaign(id) { await latency(120); return campaignById(id); },
+    async getRun(id) { await latency(60); return db.runs[id] || null; },
+    async getLeads(q) { await latency(170); let rows = [...db.leads]; if (q) { const s = q.toLowerCase(); rows = rows.filter(l => (l.name + l.email + l.company + l.title).toLowerCase().includes(s)); } return rows; },
+    async getAgents() { await latency(140); return db.agents; },
+    async getTemplates() { await latency(100); return db.templates; },
+    async getNotifications() { await latency(80); return db.notifications.slice(0, 8); },
+    async createCampaign(payload) {
+      await latency(420);
+      const c = { id: uid('CMP'), name: payload.name, criteria: payload.criteria, template: payload.template, status: 'Draft', stats: { fetched: 0, sent: 0, opened: 0, clicked: 0, bounced: 0, failed: 0 }, cost: { usd: 0, tokens: 0 }, createdAt: now() };
+      db.campaigns.unshift(c); persist(); emit('db', { type: 'campaign', campaign: c });
+      return c;
+    },
+    async launchCampaign(id) {
+      await latency(300);
+      const c = campaignById(id); if (!c || c.status === 'Running') return c;
+      c.status = 'Queued'; c.startedAt = now(); persist(); emit('db', { type: 'campaign', campaign: c });
+      orchestrate(id); // fire-and-forget like a real async job
+      return c;
+    },
+    async deleteCampaign(id) { await latency(220); db.campaigns = db.campaigns.filter(c => c.id !== id); delete db.runs[id]; persist(); emit('db', { type: 'campaigns' }); return { ok: true }; },
+    async updateLead(id, patch) { await latency(90); const l = db.leads.find(x => x.id === id); if (l) Object.assign(l, patch); persist(); emit('db', { type: 'leads' }); return l; },
+    async bulkLeads(ids, action) { await latency(300); db.leads.forEach(l => { if (ids.includes(l.id)) { if (action === 'qualified') l.status = 'Qualified'; if (action === 'contacted') l.status = 'Contacted'; if (action === 'delete') l._del = true; } }); db.leads = db.leads.filter(l => !l._del); persist(); emit('db', { type: 'leads' }); return { ok: true }; },
+    async resetDemo() { await latency(250); localStorage.removeItem(DB_KEY); location.reload(); },
+    _db: () => db, _persist: persist
+  };
+})();
+</script><script>
+/* =====================================================================
+   FRONTEND APP
+   ===================================================================== */
+const AVATAR = "data:image/png;base64,__AVATAR_B64__";
+const LOGO_SVG = `<svg width="34" height="34" viewBox="0 0 34 34" fill="none"><rect x="2" y="2" width="30" height="30" rx="8" fill="#0E1930" stroke="#00D4FF" stroke-width="1.4"/><path d="M8 12L17 19L26 12" stroke="#00D4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17" cy="22" r="2.6" fill="#8B5CF6"/><path d="M9.5 24.5C9.5 24.5 13 26.2 17 26.2C21 26.2 24.5 24.5 24.5 24.5" stroke="#00D4FF" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+
+const ICONS = {
+  dashboard: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+  campaigns: '<svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2.5-7.5L3 11z"/></svg>',
+  agents: '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.2"/><circle cx="5" cy="18" r="2.2"/><circle cx="19" cy="18" r="2.2"/><path d="M12 7.5v4M12 11.5L6 16.2M12 11.5l6 4.7"/></svg>',
+  leads: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.7c2.4.3 4 1.6 4.5 4.3"/></svg>',
+  templates: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 8l9 6 9-6"/></svg>',
+  analytics: '<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>',
+  settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.9 2.9l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.2a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.9-2.9l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.2a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.9-2.9l.1.1a1.7 1.7 0 001.9.3h.1a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.2a1.7 1.7 0 001 1.5h.1a1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.9 2.9l-.1.1a1.7 1.7 0 00-.3 1.9v.1a1.7 1.7 0 001.5 1h.2a2 2 0 110 4h-.2a1.7 1.7 0 00-1.5 1z"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  spark: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2l2.2 6.8L21 11l-6.8 2.2L12 20l-2.2-6.8L3 11l6.8-2.2L12 2z"/></svg>',
+  bolt: '<svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>',
+  send: '<svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.5 9a9 9 0 0114.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0020.5 15"/></svg>',
+  chevL: '<svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>',
+  chevR: '<svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>',
+  db: '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>',
+  mail: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>',
+  filter: '<svg viewBox="0 0 24 24"><path d="M22 3H2l8 9.5V19l4 2v-8.5L22 3z"/></svg>',
+  download: '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
+  eye: '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>',
+  clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
+  cpu: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>',
+  shield: '<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  activity: '<svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+  layers: '<svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>',
+  users: '<svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8"/></svg>',
+  collapse: '<svg viewBox="0 0 24 24"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>',
+  dollar: '<svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
+  target: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>',
+  arrowUR: '<svg viewBox="0 0 24 24"><path d="M7 17L17 7M7 7h10v10"/></svg>',
+  info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>'
+};
+const icon = (n, s) => `<span style="display:inline-flex;width:${s||16}px;height:${s||16}px;flex-shrink:0">${ICONS[n].replace('<svg', `<svg width="100%" height="100%"`)}</span>`;
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const timeAgo = (ts) => { if (!ts) return '—'; const m = Math.floor((Date.now() - ts) / 60000); if (m < 1) return 'just now'; if (m < 60) return m + ' min ago'; const h = Math.floor(m / 60); if (h < 24) return h + 'h ago'; return Math.floor(h / 24) + 'd ago'; };
+const fmtDate = (ts) => new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: ts && false ? undefined : undefined }) + ', ' + new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const pct = (a, b) => b ? ((a / b) * 100).toFixed(1) + '%' : '—';
+
+const STATUS_CHIP = { Draft: 'chip-gray', Queued: 'chip-amber', Running: 'chip-cyan', Sending: 'chip-cyan', Completed: 'chip-teal', Failed: 'chip-red', Paused: 'chip-amber' };
+const chip = (label, cls, dot) => `<span class="chip ${cls}">${dot === false ? '' : '<span class="cdot"></span>'}${esc(label)}</span>`;
+
+/* ---------- toast ---------- */
+function toast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type || '');
+  t.innerHTML = `<span style="color:${type === 'err' ? 'var(--red)' : type === 'ok' ? 'var(--teal)' : 'var(--cyan)'}">${icon(type === 'err' ? 'x' : 'check', 16)}</span><span>${msg}</span>`;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 350); }, 4200);
+}
+
+/* ---------- canvas chart helpers ---------- */
+function lineChart(canvas, series, labels, color) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  const max = Math.max(...series) * 1.15 || 1;
+  const pad = 8, stepX = (w - pad * 2) / (series.length - 1);
+  const pts = series.map((v, i) => [pad + i * stepX, h - pad - (v / max) * (h - pad * 2)]);
+  // grid
+  ctx.strokeStyle = 'rgba(148,163,184,.08)'; ctx.lineWidth = 1;
+  for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, (h / 4) * i); ctx.lineTo(w, (h / 4) * i); ctx.stroke(); }
+  // area
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, color + '44'); grad.addColorStop(1, color + '00');
+  ctx.beginPath(); ctx.moveTo(pts[0][0], h - pad); pts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.lineTo(pts[pts.length - 1][0], h - pad); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+  // line
+  ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.stroke(); ctx.shadowBlur = 0;
+  // dots
+  pts.forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 2.4, 0, 7); ctx.fillStyle = color; ctx.fill(); });
+}
+function barChart(canvas, series, labels, colors) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  const max = Math.max(...series) * 1.2 || 1;
+  const bw = Math.min(38, (w / series.length) * .55);
+  series.forEach((v, i) => {
+    const x = (w / series.length) * (i + .5) - bw / 2;
+    const bh = (v / max) * (h - 26);
+    const g = ctx.createLinearGradient(0, h - 20 - bh, 0, h - 20);
+    g.addColorStop(0, colors[i % colors.length]); g.addColorStop(1, colors[i % colors.length] + '33');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x, h - 20 - bh, bw, bh, [5, 5, 0, 0]); ctx.fill();
+    ctx.fillStyle = '#64748B'; ctx.font = '10px Inter'; ctx.textAlign = 'center';
+    ctx.fillText(labels[i], x + bw / 2, h - 6);
+  });
+}
+
+/* =====================================================================
+   LAYOUT — sidebar / header / footer
+   ===================================================================== */
+const NAV = [
+  { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { id: 'campaigns', label: 'Campaigns', icon: 'campaigns' },
+  { id: 'agents', label: 'Agents', icon: 'agents', badge: '6' },
+  { id: 'leads', label: 'Leads', icon: 'leads' },
+  { id: 'templates', label: 'Email Templates', icon: 'templates' },
+  { id: 'analytics', label: 'Analytics', icon: 'analytics' },
+  { id: 'settings', label: 'Settings', icon: 'settings' }
+];
+let currentRoute = 'dashboard';
+function navTo(route, param) { location.hash = '#/' + route + (param ? '/' + param : ''); }
+
+function renderSidebar() {
+  const sb = document.getElementById('sidebar');
+  const collapsed = localStorage.getItem('marmail_sb') === '1';
+  sb.classList.toggle('collapsed', collapsed);
+  sb.innerHTML = `
+    <div class="side-logo">${LOGO_SVG}<div class="brand-txt"><div style="font-weight:800;font-size:16.5px;letter-spacing:-.02em;line-height:1.1">Mar<span style="color:var(--cyan)">Mail</span></div><div style="font-size:9px;letter-spacing:.14em;color:var(--text-3);font-weight:600">AGENTCORE EDITION</div></div></div>
+    <nav class="nav">${NAV.map(n => `<a class="nav-item ${currentRoute === n.id ? 'active' : ''}" href="#/${n.id}">${icon(n.icon, 18)}<span>${n.label}</span>${n.badge ? `<span class="nav-badge">${n.badge}</span>` : ''}</a>`).join('')}</nav>
+    <div class="side-foot"><button class="collapse-btn" onclick="toggleSidebar()">${icon('collapse', 15)}<span style="${collapsed ? 'display:none' : ''}">Collapse</span></button></div>`;
+}
+function toggleSidebar() { localStorage.setItem('marmail_sb', document.getElementById('sidebar').classList.contains('collapsed') ? '0' : '1'); renderSidebar(); }
+
+async function renderHeader() {
+  const h = document.getElementById('header');
+  const notifs = await Backend.getNotifications();
+  h.innerHTML = `
+    <div class="search-wrap">${icon('search')}<input id="global-search" placeholder="Search campaigns, leads, agents…  ( / )" autocomplete="off"></div>
+    <div class="header-right">
+      <div style="position:relative"><button class="icon-btn" id="notif-btn" onclick="toggleNotifs(event)">${icon('bell')}<span class="notif-dot"></span></button><div id="notif-dd" style="display:none"></div></div>
+      <button class="btn btn-primary" onclick="openWizard()">${icon('plus')} New Campaign</button>
+      <img class="avatar" src="${AVATAR}" alt="Jordan Avery" title="Jordan Avery — VP Growth">
+      <div class="user-meta"><b>Jordan Avery</b><span>VP Growth · Admin</span></div>
+    </div>`;
+  const dd = document.getElementById('notif-dd');
+  dd.className = 'dropdown';
+  dd.innerHTML = `<div style="padding:12px 15px;border-bottom:1px solid var(--line-soft);display:flex;justify-content:space-between;align-items:center"><b style="font-size:13px">Notifications</b><span class="chip chip-cyan">${notifs.length} new</span></div>
+    <div style="max-height:320px;overflow-y:auto">${notifs.map(n => `<div class="notif-item"><span class="nd" style="background:${n.type === 'ok' ? 'var(--teal)' : n.type === 'warn' ? 'var(--amber)' : n.type === 'err' ? 'var(--red)' : 'var(--cyan)'}"></span><div>${esc(n.text)}<div style="color:var(--text-3);font-size:11px;margin-top:2px">${timeAgo(n.at)}</div></div></div>`).join('')}</div>`;
+  const gs = document.getElementById('global-search');
+  gs.addEventListener('input', () => { navTo('leads'); setTimeout(() => { const el = document.getElementById('lead-search'); if (el) { el.value = gs.value; el.dispatchEvent(new Event('input')); el.focus(); } }, 60); });
+}
+function toggleNotifs(e) { e.stopPropagation(); const dd = document.getElementById('notif-dd'); dd.style.display = dd.style.display === 'none' ? 'block' : 'none'; }
+document.addEventListener('click', (e) => { const dd = document.getElementById('notif-dd'); if (dd && dd.style.display === 'block' && !dd.contains(e.target)) dd.style.display = 'none'; });
+document.addEventListener('keydown', (e) => { if (e.key === '/' && !/input|textarea|select/i.test(document.activeElement.tagName)) { e.preventDefault(); document.getElementById('global-search')?.focus(); } });
+
+function renderFooter() {
+  document.getElementById('footer').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px"><span style="color:var(--cyan)">${icon('bolt', 14)}</span> Powered by <b style="color:var(--text-2)">Amazon Bedrock AgentCore</b><span style="color:var(--text-3)">· us-east-1 · runtime v2.4.1</span></div>
+    <div style="display:flex;gap:18px;align-items:center"><span class="mono" id="foot-tokens" style="color:var(--text-3)"></span><span class="health-pill"><span class="pulse-dot"></span>All systems operational</span></div>`;
+}
+setInterval(async () => { const d = await Backend.getDashboard(); const el = document.getElementById('foot-tokens'); if (el) el.textContent = Backend.tok(d.totals.tokens) + ' tokens · ' + Backend.money(d.totals.cost) + ' session cost'; }, 5000);
+
+/* =====================================================================
+   ROUTER
+   ===================================================================== */
+const routes = {};
+function route(id, fn) { routes[id] = fn; }
+async function router() {
+  const [_, r, param] = location.hash.split('/');
+  currentRoute = routes[r] ? r : 'dashboard';
+  renderSidebar();
+  const view = document.getElementById('view');
+  view.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:60vh;gap:12px;color:var(--text-2)"><div class="spinner"></div>Loading ${currentRoute}…</div>`;
+  view.scrollTop = 0;
+  try { await routes[currentRoute](view, param); } catch (e) { console.error(e); view.innerHTML = `<div class="empty-state">${icon('info', 40)}<h3 style="color:var(--text);margin-bottom:6px">Something went wrong</h3><p>${esc(e.message)}</p></div>`; }
+  renderSidebar();
+}
+window.addEventListener('hashchange', router);
+</script><script>
+/* =====================================================================
+   SCREEN 1 — DASHBOARD
+   ===================================================================== */
+route('dashboard', async (view) => {
+  const [dash, campaigns, agents] = await Promise.all([Backend.getDashboard(), Backend.getCampaigns(), Backend.getAgents()]);
+  const running = campaigns.filter(c => c.status === 'Running' || c.status === 'Sending' || c.status === 'Queued');
+  const activeAgents = agents.filter(a => a.status === 'Active').length;
+
+  view.innerHTML = `
+  <div class="fade-up">
+    <div class="page-head">
+      <div><div class="page-title">Operations Dashboard</div><div class="page-sub">Multi-agent pipeline at a glance · updated ${new Date().toLocaleTimeString()}</div></div>
+      <div style="display:flex;gap:10px"><button class="btn btn-ghost" onclick="Backend.resetDemo().then(()=>toast('Demo data reset','ok'))">${icon('refresh', 15)} Reset demo data</button><button class="btn btn-primary" onclick="openWizard()">${icon('plus', 15)} New Campaign</button></div>
+    </div>
+
+    <div class="card glow card-pad" style="margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <span class="ai-orb orb-teal" style="width:38px;height:38px;border-radius:11px">${icon('activity', 19)}</span>
+      <div style="flex:1;min-width:220px">
+        <div style="font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:9px">Agent Fleet Health <span class="chip chip-teal"><span class="cdot" style="animation:pulse 1.8s infinite"></span>Live</span></div>
+        <div style="color:var(--text-2);font-size:12.5px;margin-top:2px">${activeAgents}/6 agents active on Bedrock AgentCore · ${running.length ? running.map(c => esc(c.name)).join(', ') + ' in flight' : 'no active runs — launch a campaign to see the fleet work'}</div>
+      </div>
+      <div style="display:flex;gap:22px;flex-wrap:wrap">${agents.map(a => `<div style="text-align:center" title="${esc(a.name)}"><div class="ai-orb ${a.status === 'Active' ? 'orb-cyan' : 'orb-amber'}" style="width:32px;height:32px;margin:0 auto 5px;${a.status === 'Active' ? 'box-shadow:0 0 12px rgba(0,212,255,.3)' : ''}">${icon('cpu', 15)}</div><div style="font-size:9.5px;color:var(--text-3);max-width:56px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name.replace(' Agent', ''))}</div></div>`).join('')}</div>
+    </div>
+
+    <div class="grid-metrics stagger" style="margin-bottom:20px">
+      ${[
+        { l: 'Total Campaigns', v: dash.campaigns, sub: '+2 this week', icon: 'campaigns', c: 'var(--cyan)', bg: 'var(--cyan-dim)' },
+        { l: 'Leads Fetched', v: dash.fetched.toLocaleString(), sub: 'across all sources', icon: 'users', c: '#C4B5FD', bg: 'var(--purple-dim)' },
+        { l: 'Emails Sent', v: dash.sent.toLocaleString(), sub: pct(dash.totals.sent - dash.totals.bounced - dash.totals.failed, dash.totals.sent) + ' delivered', icon: 'send', c: 'var(--teal)', bg: 'var(--teal-dim)' },
+        { l: 'Avg Cost / Campaign', v: Backend.money(dash.avgCost), sub: Backend.tok(dash.totals.tokens) + ' tokens total', icon: 'dollar', c: 'var(--amber)', bg: 'var(--amber-dim)' }
+      ].map(m => `<div class="card card-pad"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px"><span style="color:var(--text-2);font-size:12.5px;font-weight:600">${m.l}</span><span class="ai-orb" style="background:${m.bg};color:${m.c};width:30px;height:30px">${icon(m.icon, 15)}</span></div><div class="metric-num">${m.v}</div><div style="font-size:11.5px;color:var(--text-3);margin-top:3px">${m.sub}</div></div>`).join('')}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.25fr .9fr;gap:16px;margin-bottom:20px" class="stagger">
+      <div class="card card-pad">
+        <div class="card-title">${icon('layers', 15)} Live Pipeline — Sequence → LeadGen → DB → Email</div>
+        <div style="margin-top:18px;position:relative">
+          <svg width="100%" height="14" style="position:absolute;top:29px;left:0;overflow:visible;z-index:0"><line x1="9%" y1="7" x2="91%" y2="7" stroke="rgba(0,212,255,.25)" stroke-width="1.5" stroke-dasharray="4 5"><animate attributeName="stroke-dashoffset" from="18" to="0" dur="1.2s" repeatCount="indefinite"/></svg>
+          <div style="display:flex;justify-content:space-between;position:relative;z-index:1">
+            ${['Sequence Agent', 'LeadGen', 'DB Store', 'Email Dispatch'].map((s, i) => {
+              const st = i === 0 ? 'done' : i <= running.length + 0 && running.length ? (i === 1 ? 'run' : 'wait') : (i === 1 && !running.length ? 'idle' : 'wait');
+              const glow = running.length && i === 1;
+              return `<div style="text-align:center;width:110px"><div class="ai-orb ${glow ? 'orb-cyan' : i === 0 ? 'orb-teal' : ''}" style="width:56px;height:56px;border-radius:16px;margin:0 auto 8px;border:1px solid ${glow ? 'rgba(0,212,255,.6)' : 'var(--line-soft)'};background:var(--surface-2);${glow ? 'box-shadow:0 0 22px rgba(0,212,255,.4)' : ''}">${glow ? '<div class="spinner" style="width:20px;height:20px"></div>' : icon(i === 0 ? 'spark' : i === 1 ? 'target' : i === 2 ? 'db' : 'mail', 22)}</div><div style="font-size:11.5px;font-weight:600">${s}</div><div style="font-size:10px;color:${glow ? 'var(--cyan)' : i === 0 ? 'var(--teal)' : 'var(--text-3)'};margin-top:2px">${glow ? 'processing' : i === 0 ? 'complete' : 'standby'}</div></div>`;
+            }).join('')}
+          </div>
+        </div>
+        <div style="margin-top:18px;padding-top:14px;border-top:1px dashed var(--line-soft);display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;color:var(--text-2)">${running.length ? `Active run: <b style="color:var(--cyan)">${esc(running[0].name)}</b>` : 'Pipeline idle — agents on standby'}</span>
+          ${running.length ? `<button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="navTo('run','${running[0].id}')">Watch live ${icon('arrowUR', 13)}</button>` : ''}
+        </div>
+      </div>
+      <div class="card card-pad">
+        <div class="card-title">${icon('activity', 15)} Cost & Token Usage <span class="chip chip-gray" style="margin-left:auto">14 days</span></div>
+        <canvas id="dash-chart" style="width:100%;height:190px;margin-top:12px"></canvas>
+        <div style="display:flex;gap:18px;margin-top:10px;font-size:11.5px;color:var(--text-2)">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:var(--cyan)"></span>Tokens (k)</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;border-radius:3px;background:var(--purple)"></span>Cost ($)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-pad" style="display:flex;align-items:center;justify-content:space-between;padding-bottom:14px">
+        <div class="card-title">${icon('campaigns', 15)} Recent Campaigns</div>
+        <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="navTo('campaigns')">View all ${icon('chevR', 13)}</button>
+      </div>
+      <table class="data"><thead><tr><th>Campaign</th><th>Status</th><th>Leads</th><th>Sent</th><th>Open rate</th><th>Cost</th><th></th></tr></thead>
+      <tbody>${campaigns.slice(0, 5).map(c => `<tr>
+        <td><b>${esc(c.name)}</b><div style="font-size:11px;color:var(--text-3)">${esc(c.criteria.industry)} · ${esc(c.criteria.jobTitle)}</div></td>
+        <td>${chip(c.status, STATUS_CHIP[c.status] || 'chip-gray')}</td>
+        <td class="mono">${c.stats.fetched}</td><td class="mono">${c.stats.sent}</td>
+        <td>${pct(c.stats.opened, c.stats.sent)}</td><td class="mono">${Backend.money(c.cost.usd)}</td>
+        <td style="text-align:right;white-space:nowrap">${c.status === 'Running' || c.status === 'Queued' || c.status === 'Sending' ? `<button class="btn btn-ghost" style="padding:5px 11px;font-size:11.5px" onclick="navTo('run','${c.id}')">Live</button>` : `<button class="btn btn-ghost" style="padding:5px 11px;font-size:11.5px" onclick="navTo('results','${c.id}')">Results</button>`}</td>
+      </tr>`).join('')}</tbody></table>
+    </div>
+  </div>`;
+
+  const tokens = [42, 55, 48, 71, 63, 89, 95, 82, 104, 96, 121, 132, 118, Math.max(90, Math.round(dash.totals.tokens / 1000))];
+  const cost = tokens.map(v => +(v * 0.011).toFixed(2));
+  lineChart(document.getElementById('dash-chart'), tokens, null, '#00D4FF');
+  // overlay cost as thin purple line
+  const c2 = document.getElementById('dash-chart'), ctx = c2.getContext('2d');
+});
+
+/* =====================================================================
+   SCREEN 2 — CAMPAIGNS LIST
+   ===================================================================== */
+route('campaigns', async (view) => {
+  const campaigns = await Backend.getCampaigns();
+  view.innerHTML = `
+  <div class="fade-up">
+    <div class="page-head">
+      <div><div class="page-title">Campaigns</div><div class="page-sub">${campaigns.length} campaigns · ${campaigns.filter(c => c.status === 'Draft').length} drafts ready to launch</div></div>
+      <button class="btn btn-primary" onclick="openWizard()">${icon('plus', 15)} New Campaign</button>
+    </div>
+    <div class="card">
+      ${campaigns.length ? `<table class="data"><thead><tr><th>Campaign</th><th>Targeting</th><th>Status</th><th style="text-align:right">Leads</th><th style="text-align:right">Sent</th><th style="text-align:right">Opened</th><th style="text-align:right">Cost</th><th style="text-align:right">Created</th><th></th></tr></thead>
+      <tbody>${campaigns.map(c => `<tr>
+        <td><b>${esc(c.name)}</b><div style="font-size:11px;color:var(--text-3)" class="mono">${c.id}</div></td>
+        <td style="font-size:12px;color:var(--text-2)">${esc(c.criteria.industry)}<div style="font-size:11px;color:var(--text-3)">${esc(c.criteria.location)} · ${esc(c.criteria.jobTitle)}</div></td>
+        <td>${chip(c.status, STATUS_CHIP[c.status] || 'chip-gray')}</td>
+        <td class="mono" style="text-align:right">${c.stats.fetched}</td>
+        <td class="mono" style="text-align:right">${c.stats.sent}</td>
+        <td class="mono" style="text-align:right">${pct(c.stats.opened, c.stats.sent)}</td>
+        <td class="mono" style="text-align:right">${Backend.money(c.cost.usd)}</td>
+        <td style="text-align:right;color:var(--text-3);font-size:12px">${timeAgo(c.createdAt)}</td>
+        <td style="text-align:right;white-space:nowrap">
+          ${c.status === 'Draft' || c.status === 'Completed' || c.status === 'Failed' ? `<button class="btn btn-primary" style="padding:6px 13px;font-size:12px" onclick="launchCampaign('${c.id}')">${icon('bolt', 13)} ${c.status === 'Draft' ? 'Launch' : 'Re-launch'}</button>` : `<button class="btn btn-ghost" style="padding:6px 13px;font-size:12px" onclick="navTo('run','${c.id}')">${icon('activity', 13)} Monitor</button>`}
+          <button class="icon-btn" style="width:30px;height:30px" title="Delete" onclick="deleteCampaign('${c.id}')">${icon('trash', 14)}</button>
+        </td></tr>`).join('')}</tbody></table>`
+      : `<div class="empty-state">${icon('campaigns', 44)}<h3 style="color:var(--text);margin-bottom:6px">No campaigns yet</h3><p style="margin-bottom:16px">Launch your first AI-orchestrated campaign in under a minute.</p><button class="btn btn-primary" onclick="openWizard()">${icon('plus', 15)} Create campaign</button></div>`}
+    </div>
+  </div>`;
+});
+async function launchCampaign(id) {
+  const c = await Backend.launchCampaign(id);
+  toast(`Campaign "${esc(c.name)}" handed to Sequence Agent`, 'ok');
+  navTo('run', id);
+}
+async function deleteCampaign(id) {
+  if (!confirm('Delete this campaign?')) return;
+  await Backend.deleteCampaign(id); toast('Campaign deleted', 'ok'); router();
+}
+
+/* =====================================================================
+   SCREEN 3 — CAMPAIGN CREATOR WIZARD
+   ===================================================================== */
+const WIZ = { step: 1, criteria: { industry: 'SaaS / Software', companySize: '51-200', location: 'San Francisco, US', jobTitle: 'VP Engineering', maxLeads: 100 }, template: 'outreach_a', name: '' };
+function openWizard(prefill) {
+  if (prefill) WIZ.criteria = Object.assign({}, WIZ.criteria, prefill);
+  WIZ.step = 1;
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `<div class="modal-bg" onclick="if(event.target===this)closeWizard()"><div class="modal" style="width:1060px">${'<div class="spinner" style="margin:60px auto"></div>'}</div></div>`;
+  renderWizard();
+}
+function closeWizard() { document.getElementById('modal-root').innerHTML = ''; }
+async function renderWizard() {
+  const root = document.getElementById('modal-root');
+  const templates = await Backend.getTemplates();
+  const w = WIZ, c = w.criteria;
+  const sampleLead = { first_name: 'Elena', company: 'NimbusIQ', company_size: '120-person', industry: c.industry };
+  const tpl = templates.find(t => t.id === w.template) || templates[0];
+  const personalize = (s) => s.replace(/\{\{(\w+)\}\}/g, (_, k) => sampleLead[k] || '{{' + k + '}}');
+
+  const stepHead = ['Targeting Criteria', 'Email Template', 'Review & Launch'].map((s, i) => {
+    const n = i + 1, cls = n < w.step ? 'done' : n === w.step ? 'now' : '';
+    return `<div class="step ${cls}"><div class="s-dot">${n < w.step ? '✓' : n}</div><div class="s-label">${s}</div></div>${n < 3 ? `<div class="step-bar ${n < w.step ? 'fill' : ''}"><i></i></div>` : ''}`;
+  }).join('');
+
+  let body = '';
+  if (w.step === 1) body = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div class="field"><label>Industry</label><select id="w-industry">${Object.keys(COMPANY_LIST).map(i => `<option ${i === c.industry ? 'selected' : ''}>${i}</option>`).join('')}</select></div>
+      <div class="field"><label>Company size</label><select id="w-size">${['1-50', '51-200', '201-1000', '1000+'].map(s => `<option ${s === c.companySize ? 'selected' : ''} value="${s}">${SIZE_LABEL[s]}</option>`).join('')}</select></div>
+    </div>
+    <div class="field"><label>Location</label><select id="w-loc">${LOCS.map(l => `<option ${l === c.location ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    <div class="field"><label>Job titles <span style="color:var(--text-3);font-weight:400">(multi-select)</span></label>
+      <div class="chip-select" id="w-titles">${Object.keys(TITLE_BY).map(t => `<button class="sel-chip ${t === c.jobTitle ? 'on' : ''}" data-t="${t}">${t}</button>`).join('')}</div>
+      <div class="hint">The LeadGen Agent maps each title to role synonyms during search.</div></div>
+    <div class="field"><label>Max leads</label><div class="range-wrap"><input type="range" id="w-max" min="10" max="500" step="10" value="${c.maxLeads}" oninput="this.style.setProperty('--fill',((this.value-10)/490*100)+'%');document.getElementById('w-maxv').textContent=this.value"><span class="range-val" id="w-maxv">${c.maxLeads}</span></div>
+      <div class="hint">Critique Agent enforces quality — expect ~15% filtered before send.</div></div>`;
+  else if (w.step === 2) body = `
+    <div class="field"><label>Template</label><select id="w-tpl">${templates.map(t => `<option value="${t.id}" ${t.id === w.template ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
+      <div class="hint">The Email Agent rewrites per-lead personalization blocks via Bedrock while keeping the approved spine.</div></div>
+    <div class="field"><label>Subject line</label><input id="w-subj" value="${esc(personalize(tpl.subject))}"></div>
+    <div class="field"><label>Body preview (sample lead: Elena @ NimbusIQ)</label><textarea id="w-body" rows="9" style="resize:vertical;line-height:1.65">${esc(personalize(tpl.body))}</textarea></div>`;
+  else body = `
+    <div class="field"><label>Campaign name</label><input id="w-name" value="${esc(w.name || autoName())}" placeholder="e.g. Q4 DevTools EM Wave"></div>
+    <div class="card" style="background:rgba(0,212,255,.03);border-color:rgba(0,212,255,.2);border-radius:12px">
+      <div style="padding:14px 16px">
+        <div class="kv"><span style="color:var(--text-2)">ICP</span><b>${esc(c.industry)} · ${SIZE_LABEL[c.companySize]} · ${esc(c.location)}</b></div>
+        <div class="kv"><span style="color:var(--text-2)">Titles</span><b>${esc(c.jobTitle)}</b></div>
+        <div class="kv"><span style="color:var(--text-2)">Lead target</span><b class="mono">${c.maxLeads}</b></div>
+        <div class="kv"><span style="color:var(--text-2)">Template</span><b>${esc(tpl.name)}</b></div>
+        <div class="kv"><span style="color:var(--text-2)">Agents engaged</span><b style="color:var(--cyan)">Sequence → LeadGen+Critique → DB → Email+Critique → Loop</b></div>
+        <div class="kv"><span style="color:var(--text-2)">Est. cost</span><b class="mono" style="color:var(--amber)">~${Backend.money(c.maxLeads * 0.11 + 1.2)}</b><span style="font-size:11px;color:var(--text-3)">(${Math.round((c.maxLeads * 0.11 + 1.2) * 8200).toLocaleString()} tokens)</span></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-start;background:var(--purple-dim);border:1px solid rgba(139,92,246,.25);border-radius:12px;padding:12px 14px;font-size:12.5px;color:#C4B5FD;margin-top:14px">${icon('spark', 16)}<span>On launch, the <b>Sequence Agent</b> decomposes this brief into subtasks, the <b>Critique Agents</b> gate each module with PASS/FAIL, and the <b>Loop Agent</b> auto-recovers failures.</span></div>`;
+
+  root.innerHTML = `
+  <div class="modal-bg" onclick="if(event.target===this)closeWizard()">
+    <div class="modal" style="width:1060px;height:88vh">
+      <div style="padding:20px 26px 0;display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:10px"><span class="ai-orb orb-cyan">${icon('spark', 14)}</span><b style="font-size:15px">Campaign Creator</b></div>
+        <button class="icon-btn" onclick="closeWizard()">${icon('x', 16)}</button>
+      </div>
+      <div style="padding:18px 26px 0"><div class="stepper">${stepHead}</div></div>
+      <div style="flex:1;display:grid;grid-template-columns:1.05fr .95fr;gap:0;overflow:hidden">
+        <div style="padding:6px 26px 20px;overflow-y:auto;border-right:1px solid var(--line-soft)">
+          ${body}
+          <div style="display:flex;justify-content:space-between;margin-top:22px">
+            <button class="btn btn-ghost" ${w.step === 1 ? 'style="visibility:hidden"' : ''} onclick="wizNav(-1)">${icon('chevL', 15)} Back</button>
+            ${w.step < 3 ? `<button class="btn btn-primary" onclick="wizNav(1)">Continue ${icon('chevR', 15)}</button>`
+              : `<button class="btn btn-primary" id="launch-btn" onclick="wizLaunch()">${icon('bolt', 15)} Launch with AI Agents</button>`}
+          </div>
+        </div>
+        <div style="padding:6px 26px 20px;overflow-y:auto;background:rgba(6,14,32,.4)">
+          <div class="card-title" style="margin-bottom:12px">${icon('eye', 15)} Live email preview <span class="chip chip-purple" style="margin-left:auto">${icon('spark', 11)} AI personalized</span></div>
+          <div style="background:#0E1930;border:1px solid var(--line-soft);border-radius:14px;overflow:hidden">
+            <div style="padding:12px 16px;border-bottom:1px solid var(--line-soft);display:flex;gap:10px;align-items:center"><span style="color:var(--text-3)">${icon('mail', 15)}</span><span style="font-size:12.5px;color:var(--text-2)" id="pv-subject">${esc(personalize(tpl.subject))}</span></div>
+            <div style="padding:18px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text)" id="pv-body">${esc(personalize(tpl.body))}</div>
+            <div style="padding:10px 18px;border-top:1px dashed var(--line-soft);font-size:11px;color:var(--text-3)">To: elena.vasquez@nimbusiq.io · From: jordan@marmail.ai · DKIM signed via SES</div>
+          </div>
+          <div style="margin-top:14px;font-size:12px;color:var(--text-3);display:flex;gap:8px;align-items:center">${icon('info', 14)} Preview renders a sample lead — the Email Agent personalizes every record individually at send time.</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  // bindings
+  const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('change', fn); };
+  bind('w-industry', e => { c.industry = e.target.value; syncPreview(); });
+  bind('w-size', e => { c.companySize = e.target.value; });
+  bind('w-loc', e => { c.location = e.target.value; });
+  bind('w-tpl', e => { w.template = e.target.value; renderWizard(); });
+  bind('w-name', e => { w.name = e.target.value; });
+  document.querySelectorAll('#w-titles .sel-chip').forEach(ch => ch.addEventListener('click', () => {
+    document.querySelectorAll('#w-titles .sel-chip').forEach(x => x.classList.remove('on'));
+    ch.classList.add('on'); c.jobTitle = ch.dataset.t;
+  }));
+  ['w-subj', 'w-body'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', syncPreview); });
+  const slider = document.getElementById('w-max');
+  if (slider) { slider.style.setProperty('--fill', ((c.maxLeads - 10) / 490 * 100) + '%'); slider.addEventListener('input', () => c.maxLeads = +slider.value); }
+}
+function syncPreview() {
+  const s = document.getElementById('w-subj'), b = document.getElementById('w-body');
+  if (s) document.getElementById('pv-subject').textContent = s.value;
+  if (b) document.getElementById('pv-body').textContent = b.value;
+}
+function autoName() { const c = WIZ.criteria; return `${new Date().toLocaleDateString('en-US', { month: 'short' })} ${c.industry.split(' ')[0]} — ${c.jobTitle} Wave`; }
+function wizNav(dir) {
+  if (WIZ.step === 2) { const s = document.getElementById('w-subj'), b = document.getElementById('w-body'); if (s) Backend._db().templates.find(t => t.id === WIZ.template)._subj = 1; }
+  WIZ.step = Math.min(3, Math.max(1, WIZ.step + dir)); renderWizard();
+}
+async function wizLaunch() {
+  const nameEl = document.getElementById('w-name');
+  const btn = document.getElementById('launch-btn');
+  btn.disabled = true; btn.innerHTML = `<div class="spinner" style="border-color:rgba(4,18,30,.3);border-top-color:#04121E"></div> Handing off to Sequence Agent…`;
+  const c = await Backend.createCampaign({ name: nameEl.value.trim() || autoName(), criteria: Object.assign({}, WIZ.criteria), template: WIZ.template });
+  closeWizard();
+  toast(`Campaign created — launching agent fleet`, 'ok');
+  await Backend.launchCampaign(c.id);
+  navTo('run', c.id);
+}
+</script><script>
+/* =====================================================================
+   SCREEN 4 — LIVE AGENT ORCHESTRATION
+   ===================================================================== */
+route('run', async (view, campaignId) => {
+  const c = await Backend.getCampaign(campaignId);
+  if (!c) { view.innerHTML = `<div class="empty-state">${icon('info', 40)}<h3 style="color:var(--text)">Campaign not found</h3></div>`; return; }
+  let run = await Backend.getRun(campaignId);
+
+  const NODE_DEFS = {
+    seq: { label: 'Sequence Agent', sub: 'Orchestrator', orb: 'orb-cyan', i: 'spark' },
+    leadgen: { label: 'LeadGen', sub: 'Discovery + Enrichment', orb: 'orb-purple', i: 'target' },
+    leadgen_crit: { label: 'Critique', sub: 'ICP gate', orb: 'orb-purple', i: 'shield', mini: true },
+    db: { label: 'DB Module', sub: 'Aurora upsert + dedupe', orb: 'orb-teal', i: 'db' },
+    db_crit: { label: 'Critique', sub: 'Schema gate', orb: 'orb-teal', i: 'shield', mini: true },
+    email: { label: 'Email Module', sub: 'Bedrock render + SES', orb: 'orb-amber', i: 'mail' },
+    email_crit: { label: 'Critique', sub: 'Delivery gate', orb: 'orb-amber', i: 'shield', mini: true },
+    loop: { label: 'Loop Agent', sub: 'Recovery', orb: 'orb-cyan', i: 'refresh' }
+  };
+  const nodeHtml = (key) => {
+    const d = NODE_DEFS[key]; const st = run ? run.nodes[key] : 'idle';
+    const cls = st === 'running' ? 'running' : st === 'success' ? 'success' : st === 'failed' ? 'failed' : '';
+    const inner = st === 'running' ? '<div class="spinner"></div>' : st === 'success' ? `<span style="color:var(--teal)">${icon('check', 14)}</span>` : st === 'failed' ? `<span style="color:var(--red)">${icon('x', 13)}</span>` : icon(d.i, 14);
+    return `<div class="agent-node ${cls}" id="node-${key}" style="${d.mini ? 'padding:9px 12px;min-width:118px' : 'min-width:168px'}">
+      <div class="an-head"><span class="ai-orb ${d.orb}" style="width:24px;height:24px;border-radius:7px">${inner}</span>
+        <div><div style="font-weight:700;font-size:${d.mini ? 11.5 : 12.5}px">${d.label}</div><div style="font-size:9.5px;color:var(--text-3)">${d.sub}</div></div></div>
+      <div id="node-state-${key}" style="font-size:10px;color:${st === 'running' ? 'var(--cyan)' : st === 'success' ? 'var(--teal)' : st === 'failed' ? 'var(--red)' : 'var(--text-3)'};text-transform:uppercase;letter-spacing:.07em;font-weight:700">${st}</div>
+    </div>`;
+  };
+
+  view.innerHTML = `
+  <div class="fade-up" style="display:grid;grid-template-columns:1fr 370px;gap:16px;height:100%">
+    <div style="min-width:0">
+      <div class="page-head" style="margin-bottom:16px">
+        <div><div style="display:flex;align-items:center;gap:10px"><div class="page-title">Live Agent Orchestration</div>${chip(c.status, STATUS_CHIP[c.status] || 'chip-gray')}</div>
+        <div class="page-sub"><b style="color:var(--text)">${esc(c.name)}</b> · session ${c.id.toLowerCase()} · Bedrock AgentCore runtime</div></div>
+        <button class="btn btn-ghost" onclick="navTo('campaigns')">${icon('chevL', 14)} All campaigns</button>
+      </div>
+      <div class="card card-pad" style="position:relative;overflow:hidden">
+        <div class="card-title">${icon('layers', 15)} Agent Execution Graph</div>
+        <div style="display:flex;flex-direction:column;align-items:center;padding:14px 0 4px;position:relative">
+          <svg id="flow-wires" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0"></svg>
+          <div style="position:relative;z-index:1;margin-bottom:34px">${nodeHtml('seq')}</div>
+          <div style="display:flex;gap:26px;position:relative;z-index:1">
+            <div style="display:flex;flex-direction:column;gap:10px;align-items:center">${nodeHtml('leadgen')}<div style="color:var(--text-3)">${icon('chevR', 14)}</div>${nodeHtml('leadgen_crit')}</div>
+            <div style="display:flex;flex-direction:column;gap:10px;align-items:center">${nodeHtml('db')}<div style="color:var(--text-3)">${icon('chevR', 14)}</div>${nodeHtml('db_crit')}</div>
+            <div style="display:flex;flex-direction:column;gap:10px;align-items:center">${nodeHtml('email')}<div style="color:var(--text-3)">${icon('chevR', 14)}</div>${nodeHtml('email_crit')}</div>
+          </div>
+          <div style="position:absolute;right:8px;top:36%;z-index:1">${nodeHtml('loop')}</div>
+        </div>
+        <div id="run-progress-row" style="margin-top:16px;border-top:1px dashed var(--line-soft);padding-top:14px">
+          ${['leadgen', 'db', 'email'].map(m => `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:5px"><span style="color:var(--text-2);text-transform:capitalize">${m} module</span><span class="mono" id="pg-${m}-txt">${run && run.phase !== 'queued' ? '—' : 'waiting'}</span></div><div class="progress"><i id="pg-${m}" style="width:0%"></i></div></div>`).join('')}
+        </div>
+      </div>
+      <div class="card card-pad" style="margin-top:16px" id="verdict-card">
+        <div class="card-title">${icon('shield', 15)} Critique Verdicts</div>
+        <div id="verdicts" style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+          ${run && run.verdicts.length ? run.verdicts.map(v => `<div style="flex:1;min-width:170px;background:rgba(148,163,184,.04);border:1px solid var(--line-soft);border-radius:12px;padding:12px 14px">
+            <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:12.5px">${v.module}</b>${chip(v.verdict, v.verdict === 'PASS' ? 'chip-teal' : 'chip-red')}</div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:5px">${esc(v.detail)}</div></div>`).join('')
+          : `<div style="color:var(--text-3);font-size:12.5px;padding:8px 0">No verdicts yet — critique agents report as each module completes.</div>`}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+      <div class="card card-pad" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">Tokens</div><div class="metric-num" style="font-size:20px" id="rt-tokens">${run ? Backend.tok(run.tokens) : '0'}</div></div>
+        <div><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">Run cost</div><div class="metric-num" style="font-size:20px;color:var(--amber)" id="rt-cost">${run ? Backend.money(run.cost) : '$0.00'}</div></div>
+        <div><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">Retries</div><div class="metric-num" style="font-size:20px;color:var(--purple)" id="rt-retries">${run ? run.retries.leadgen + run.retries.db + run.retries.email : 0}</div></div>
+        <div><div style="font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">Phase</div><div class="metric-num" style="font-size:15px;color:var(--cyan);text-transform:capitalize" id="rt-phase">${run ? run.phase : '—'}</div></div>
+      </div>
+      <div class="card" style="flex:1;display:flex;flex-direction:column;min-height:280px">
+        <div class="card-pad" style="padding-bottom:12px;display:flex;align-items:center"><div class="card-title">${icon('activity', 15)} Live Run Log</div><span class="chip chip-cyan" style="margin-left:auto"><span class="cdot" style="animation:pulse 1.8s infinite"></span>streaming</span></div>
+        <div class="log-panel" id="run-log"><div style="color:var(--text-3)">${run && run.logs.length ? '' : 'Awaiting run events…'}</div></div>
+      </div>
+    </div>
+  </div>`;
+
+  const logEl = document.getElementById('run-log');
+  const paintLog = (l) => {
+    const div = document.createElement('div'); div.className = 'log-line';
+    div.innerHTML = `<span class="log-ts">${new Date(l.t).toLocaleTimeString('en-US', { hour12: false })}</span><span class="lg-${l.level}">${esc(l.msg)}${l.tokens ? ` <span class="lg-tok">+${l.tokens}tok</span>` : ''}</span>`;
+    logEl.appendChild(div); logEl.scrollTop = logEl.scrollHeight;
+  };
+  (run ? run.logs : []).forEach(paintLog);
+
+  const drawWires = () => {
+    const svg = document.getElementById('flow-wires'); if (!svg) return;
+    const box = svg.parentElement.getBoundingClientRect();
+    svg.setAttribute('viewBox', `0 0 ${box.width} ${box.height}`);
+    const ctr = (id) => { const el = document.getElementById(id); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left - box.left + r.width / 2, y: r.top - box.top }; };
+    const a = ctr('node-seq'), kids = ['node-leadgen', 'node-db', 'node-email'].map(ctr).filter(Boolean);
+    let html = '';
+    if (a) kids.forEach(k => { html += `<path d="M${a.x} ${a.y + 74} C ${a.x} ${(a.y + k.y) / 2}, ${k.x} ${(a.y + k.y) / 2}, ${k.x} ${k.y - 6}" fill="none" stroke="rgba(0,212,255,.3)" stroke-width="1.3" stroke-dasharray="3 5"><animate attributeName="stroke-dashoffset" from="16" to="0" dur="1.1s" repeatCount="indefinite"/></path>`; });
+    const loop = ctr('node-loop');
+    if (loop && kids.length) { const k = kids[1]; html += `<path d="M${k.x + 90} ${k.y + 40} Q ${loop.x - 40} ${loop.y - 30}, ${loop.x - 70} ${loop.y}" fill="none" stroke="rgba(139,92,246,.35)" stroke-width="1.2" stroke-dasharray="3 5"><animate attributeName="stroke-dashoffset" from="0" to="16" dur="1.4s" repeatCount="indefinite"/></path>`; }
+    svg.innerHTML = html;
+  };
+  setTimeout(drawWires, 60); window.addEventListener('resize', drawWires);
+
+  const progress = { leadgen: { t: run ? run.leadsTarget : 0, d: 0 }, db: { t: 0, d: 0 }, email: { t: 0, d: 0 } };
+  const setPg = (m) => { const p = progress[m]; const el = document.getElementById('pg-' + m); if (el && p.t) { el.style.width = Math.min(100, p.d / p.t * 100) + '%'; const tx = document.getElementById('pg-' + m + '-txt'); if (tx) tx.textContent = `${p.d}/${p.t}`; } };
+  if (run) { progress.leadgen = { t: run.leadsTarget, d: run.phase !== 'leadgen' && run.phase !== 'queued' ? run.leadsTarget : 0 }; setPg('leadgen'); }
+
+  const offLog = Backend.on('run-log', ({ campaignId: cid, line }) => { if (cid !== campaignId) return; paintLog(line); const r = document.getElementById('rt-tokens'); if (r) r.textContent = Backend.tok((Backend._db().runs[cid] || { tokens: 0 }).tokens); const co = document.getElementById('rt-cost'); if (co) co.textContent = Backend.money((Backend._db().runs[cid] || { cost: 0 }).cost); });
+  const offState = Backend.on('run-state', ({ campaignId: cid, run: r }) => {
+    if (cid !== campaignId) return;
+    document.getElementById('rt-phase').textContent = r.phase;
+    document.getElementById('rt-retries').textContent = r.retries.leadgen + r.retries.db + r.retries.email;
+    Object.keys(r.nodes).forEach(k => {
+      const el = document.getElementById('node-' + k), stEl = document.getElementById('node-state-' + k);
+      if (!el) return; const st = r.nodes[k];
+      el.classList.remove('running', 'success', 'failed');
+      if (st === 'running' || st === 'success' || st === 'failed') el.classList.add(st);
+      const d = NODE_DEFS[k];
+      const inner = st === 'running' ? '<div class="spinner"></div>' : st === 'success' ? `<span style="color:var(--teal)">${icon('check', 14)}</span>` : st === 'failed' ? `<span style="color:var(--red)">${icon('x', 13)}</span>` : icon(d.i, 14);
+      el.querySelector('.ai-orb').innerHTML = inner;
+      stEl.textContent = st; stEl.style.color = st === 'running' ? 'var(--cyan)' : st === 'success' ? 'var(--teal)' : st === 'failed' ? 'var(--red)' : 'var(--text-3)';
+    });
+    if (r.phase === 'db') { progress.db.t = r.leadsTarget; }
+    const vc = document.getElementById('verdicts');
+    if (vc && r.verdicts.length) vc.innerHTML = r.verdicts.map(v => `<div style="flex:1;min-width:170px;background:rgba(148,163,184,.04);border:1px solid var(--line-soft);border-radius:12px;padding:12px 14px"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:12.5px">${v.module}</b>${chip(v.verdict, v.verdict === 'PASS' ? 'chip-teal' : 'chip-red')}</div><div style="font-size:11px;color:var(--text-3);margin-top:5px">${esc(v.detail)}</div></div>`).join('');
+    setTimeout(drawWires, 50);
+  });
+  const offProg = Backend.on('run-progress', ({ campaignId: cid, module, done, total }) => { if (cid !== campaignId) return; progress[module] = { t: total, d: done }; if (module === 'email' && !progress.db.t) { progress.db = { t: total, d: total }; } if (module === 'email') setPg('db'); setPg(module); });
+  const offDone = Backend.on('run-done', ({ campaignId: cid }) => { if (cid !== campaignId) return; toast('Run complete — results ready', 'ok'); setTimeout(() => navTo('results', cid), 1600); });
+  const origRouter = router;
+  const cleanup = () => { offLog(); offState(); offProg(); offDone(); };
+  const obs = setInterval(() => { if (location.hash.indexOf('run/' + campaignId) !== 0 && location.hash !== '#/run/' + campaignId) { cleanup(); clearInterval(obs); } }, 800);
+});
+</script><script>
+/* ============ SCREEN 5 — LEADS DATABASE ============ */
+let LEAD_SEL = new Set();
+route('leads', async (view) => {
+  LEAD_SEL = new Set();
+  const leads = await Backend.getLeads();
+  const sources = [...new Set(leads.map(l => l.source))];
+  view.innerHTML = `
+  <div class="fade-up">
+    <div class="page-head">
+      <div><div class="page-title">Leads Database</div><div class="page-sub" id="lead-count">${leads.length} enriched records · synced by DB Agent</div></div>
+      <button class="btn btn-ghost" onclick="exportLeads()">${icon('download',15)} Export CSV</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+      <div class="search-wrap" style="width:280px">${icon('search')}<input id="lead-search" placeholder="Search name, email, company…"></div>
+      <select id="lead-source"><option value="">All sources</option>${sources.map(s=>`<option>${s}</option>`).join('')}</select>
+      <div class="chip-select" id="lead-status-f">${['','New','Qualified','Contacted'].map(s=>`<button class="sel-chip ${s===''?'on':''}" data-s="${s}">${s||'All statuses'}</button>`).join('')}</div>
+      <div id="bulk-bar" style="display:none;margin-left:auto;display:none;align-items:center;gap:8px">
+        <span class="chip chip-cyan" id="bulk-count">0 selected</span>
+        <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="bulkAction('qualified')">Mark qualified</button>
+        <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="bulkAction('contacted')">Mark contacted</button>
+        <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="bulkAction('delete')">Delete</button>
+      </div>
+    </div>
+    <div class="card" style="overflow:hidden"><div style="overflow-x:auto"><table class="data" id="lead-table"></table></div></div>
+  </div>`;
+  const state = { q: '', source: '', status: '' };
+  const draw = () => {
+    const rows = Backend._db().leads.filter(l =>
+      (!state.q || (l.name+l.email+l.company+l.title).toLowerCase().includes(state.q)) &&
+      (!state.source || l.source === state.source) && (!state.status || l.status === state.status));
+    document.getElementById('lead-count').textContent = `${rows.length} enriched records · synced by DB Agent`;
+    const allChecked = rows.length && rows.every(l => LEAD_SEL.has(l.id));
+    document.getElementById('lead-table').innerHTML = `
+      <thead><tr><th style="width:34px"><input type="checkbox" id="sel-all" ${allChecked?'checked':''}></th><th>Name</th><th>Email</th><th>Title</th><th>Company</th><th>Source</th><th>Status</th><th>Validation</th><th>Fetched</th></tr></thead>
+      <tbody>${rows.length ? rows.map(l => `<tr>
+        <td><input type="checkbox" class="sel-row" data-id="${l.id}" ${LEAD_SEL.has(l.id)?'checked':''}></td>
+        <td><b>${esc(l.name)}</b>${l.deduped?` <span class="chip chip-amber" style="font-size:9.5px;padding:1px 7px">dupe</span>`:''}</td>
+        <td class="mono" style="font-size:12px">${esc(l.email)}</td>
+        <td style="font-size:12px">${esc(l.title)}</td>
+        <td style="font-size:12px">${esc(l.company)}</td>
+        <td><span class="chip chip-gray">${esc(l.source)}</span></td>
+        <td>${chip(l.status, l.status==='Qualified'?'chip-teal':l.status==='Contacted'?'chip-purple':'chip-cyan')}</td>
+        <td>${chip(l.validation, l.validation==='Valid'?'chip-teal':'chip-amber', false)}</td>
+        <td style="color:var(--text-3);font-size:12px">${timeAgo(l.fetchedAt)}</td></tr>`).join('')
+      : `<tr><td colspan="9"><div class="empty-state">${icon('users',38)}<p>No leads match these filters.</p></div></td></tr>`}</tbody>`;
+    document.getElementById('sel-all').onchange = e => { rows.forEach(l => e.target.checked ? LEAD_SEL.add(l.id) : LEAD_SEL.delete(l.id)); draw(); };
+    document.querySelectorAll('.sel-row').forEach(cb => cb.onchange = () => { cb.checked ? LEAD_SEL.add(cb.dataset.id) : LEAD_SEL.delete(cb.dataset.id); syncBulk(); });
+    syncBulk();
+  };
+  const syncBulk = () => { const b = document.getElementById('bulk-bar'); b.style.display = LEAD_SEL.size ? 'flex' : 'none'; document.getElementById('bulk-count').textContent = LEAD_SEL.size + ' selected'; };
+  document.getElementById('lead-search').addEventListener('input', e => { state.q = e.target.value.toLowerCase(); draw(); });
+  document.getElementById('lead-source').addEventListener('change', e => { state.source = e.target.value; draw(); });
+  document.querySelectorAll('#lead-status-f .sel-chip').forEach(ch => ch.onclick = () => { document.querySelectorAll('#lead-status-f .sel-chip').forEach(x=>x.classList.remove('on')); ch.classList.add('on'); state.status = ch.dataset.s; draw(); });
+  draw();
+});
+async function bulkAction(a) { await Backend.bulkLeads([...LEAD_SEL], a); LEAD_SEL.clear(); toast('Bulk action applied', 'ok'); router(); }
+function exportLeads() {
+  const rows = Backend._db().leads.map(l => [l.name, l.email, l.title, l.company, l.source, l.status].join(','));
+  const blob = new Blob(['name,email,title,company,source,status\n' + rows.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'marmail-leads.csv'; a.click();
+}
+
+/* ============ SCREEN 6 — CAMPAIGN RESULTS / EMAIL PERFORMANCE ============ */
+route('results', async (view, id) => {
+  const c = await Backend.getCampaign(id);
+  if (!c) { view.innerHTML = `<div class="empty-state"><h3 style="color:var(--text)">Campaign not found</h3></div>`; return; }
+  const s = c.stats, del = s.sent + s.bounced + s.failed;
+  const seedN = [...c.id].reduce((a, ch) => a + ch.charCodeAt(0), 0);
+  const rnd = (i) => { const x = Math.sin(seedN + i * 91) * 10000; return x - Math.floor(x); };
+  const statuses = ['Delivered', 'Opened', 'Clicked', 'Bounced', 'Failed'];
+  const logRows = Array.from({ length: Math.min(12, Math.max(4, Math.round(del / 9))) }, (_, i) => {
+    const r = rnd(i); const st = r < .78 ? (r < .5 ? 'Delivered' : r < .62 ? 'Opened' : 'Clicked') : r < .92 ? 'Bounced' : 'Failed';
+    return st;
+  });
+  view.innerHTML = `
+  <div class="fade-up">
+    <div class="page-head">
+      <div><div style="display:flex;gap:10px;align-items:center"><button class="icon-btn" style="width:30px;height:30px" onclick="navTo('campaigns')">${icon('chevL',15)}</button><div class="page-title">${esc(c.name)}</div>${chip(c.status, STATUS_CHIP[c.status]||'chip-gray')}</div>
+      <div class="page-sub">${esc(c.criteria.industry)} · ${esc(c.criteria.jobTitle)} · ${esc(c.criteria.location)} · ${Backend.money(c.cost.usd)} · ${Backend.tok(c.cost.tokens)} tokens</div></div>
+      <button class="btn btn-primary" onclick="launchCampaign('${c.id}')">${icon('refresh',14)} Re-launch</button>
+    </div>
+    <div class="grid-metrics stagger" style="margin-bottom:18px">
+      <div class="card card-pad"><div style="color:var(--text-2);font-size:12.5px;font-weight:600;margin-bottom:8px">Sent</div><div class="metric-num" style="color:var(--teal)">${s.sent}</div><div class="hint">${pct(s.sent, del)} of attempted</div></div>
+      <div class="card card-pad"><div style="color:var(--text-2);font-size:12.5px;font-weight:600;margin-bottom:8px">Bounced</div><div class="metric-num" style="color:var(--amber)">${s.bounced}</div><div class="hint">${pct(s.bounced, del)} bounce rate</div></div>
+      <div class="card card-pad"><div style="color:var(--text-2);font-size:12.5px;font-weight:600;margin-bottom:8px">Failed</div><div class="metric-num" style="color:var(--red)">${s.failed}</div><div class="hint">suppressed automatically</div></div>
+      <div class="card card-pad"><div style="color:var(--text-2);font-size:12.5px;font-weight:600;margin-bottom:8px">Cost per send</div><div class="metric-num" style="color:var(--cyan)">${s.sent?Backend.money(c.cost.usd/s.sent):'—'}</div><div class="hint">vs $0.38 industry avg</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1.15fr .85fr;gap:16px;margin-bottom:18px" class="stagger">
+      <div class="card card-pad">
+        <div class="card-title">${icon('activity',15)} Engagement Funnel</div>
+        <canvas id="res-chart" style="width:100%;height:200px;margin-top:12px"></canvas>
+        <div style="display:flex;gap:16px;margin-top:10px;font-size:11.5px;color:var(--text-2)">
+          <span>Open rate <b style="color:var(--cyan)">${pct(s.opened, s.sent)}</b></span>
+          <span>Click rate <b style="color:var(--purple)">${pct(s.clicked, s.sent)}</b></span>
+          <span>Click-to-open <b style="color:var(--teal)">${pct(s.clicked, s.opened)}</b></span>
+        </div>
+      </div>
+      <div class="card card-pad">
+        <div class="card-title">${icon('spark',15)} Personalization Sample <span class="chip chip-purple" style="margin-left:auto">${icon('bolt',11)} Bedrock</span></div>
+        <div style="background:#0E1930;border:1px solid var(--line-soft);border-radius:12px;padding:14px;margin-top:12px;font-size:12.5px;line-height:1.65">
+          <div style="color:var(--text-3);font-size:11px;margin-bottom:6px">SUBJECT — rewritten per lead</div>
+          <b>How ${esc(c.criteria.industry.split(' ')[0].toLowerCase())} teams like yours cut CAC 40% this quarter</b>
+          <div style="color:var(--text-3);font-size:11px;margin:12px 0 6px">OPENING LINE</div>
+          <span style="color:var(--text)">Hi Elena — saw NimbusIQ just crossed the 100-eng scale mark, which usually means manual outbound is starting to buckle…</span>
+          <div style="margin-top:10px">${chip('persona-matched', 'chip-teal', false)} ${chip('tone: consultative', 'chip-cyan', false)} ${chip('ICP-aligned', 'chip-purple', false)}</div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div class="card-pad" style="padding-bottom:12px"><div class="card-title">${icon('mail',15)} Send Log</div></div>
+      <table class="data"><thead><tr><th>Recipient</th><th>Event</th><th>Detail</th><th>Time</th></tr></thead><tbody>
+      ${logRows.map((st, i) => `<tr>
+        <td class="mono" style="font-size:12px">${(Backend._db().leads[i]||{email:'lead'+i+'@example.io'}).email}</td>
+        <td>${chip(st, st==='Delivered'?'chip-teal':st==='Opened'?'chip-cyan':st==='Clicked'?'chip-purple':st==='Bounced'?'chip-amber':'chip-red')}</td>
+        <td style="font-size:12px;color:var(--text-2)">${st==='Bounced'?'550 5.1.1 mailbox unavailable':st==='Failed'?'SES throttling retry exhausted':st==='Clicked'?'CTA link visited · +reply intent':'250 OK · 0.31s'}</td>
+        <td style="font-size:12px;color:var(--text-3)">${fmtDate((c.startedAt||c.createdAt) + i * 47000)}</td></tr>`).join('')}
+      </tbody></table>
+    </div>
+  </div>`;
+  barChart(document.getElementById('res-chart'), [s.sent, s.opened, s.clicked, s.bounced, s.failed], ['Sent','Opened','Clicked','Bounced','Failed'], ['#00D4FF', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444']);
+});
+
+/* ============ SCREEN 7 — AGENTS OVERVIEW ============ */
+route('agents', async (view) => {
+  const agents = await Backend.getAgents();
+  view.innerHTML = `
+  <div class="fade-up">
+    <div class="page-head">
+      <div><div class="page-title">Agent Fleet</div><div class="page-sub">Six specialized agents running on Amazon Bedrock AgentCore · critique-gated execution graph</div></div>
+      ${chip('5 active · 1 standby', 'chip-teal')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px" class="stagger">
+      ${agents.map((a, i) => `<div class="card card-pad ${a.status==='Active'?'glow':''}" style="${a.status==='Active'?'border-color:rgba(0,212,255,.3)':''}">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <span class="ai-orb ${['orb-cyan','orb-purple','orb-purple','orb-teal','orb-amber','orb-cyan'][i]}" style="width:40px;height:40px;border-radius:12px;${a.status==='Active'?'box-shadow:0 0 16px rgba(0,212,255,.3)':''}">${icon('cpu', 19)}</span>
+          <div style="flex:1"><b style="font-size:14px">${esc(a.name)}</b><div style="font-size:11px;color:var(--text-3)">${esc(a.model)}</div></div>
+          ${chip(a.status, a.status==='Active'?'chip-teal':'chip-amber')}
+        </div>
+        <p style="font-size:12.5px;color:var(--text-2);min-height:56px">${esc(a.role)}</p>
+        <div style="display:flex;gap:14px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line-soft);font-size:11.5px">
+          <span style="color:var(--text-3)">Runs <b style="color:var(--text)">${a.runs}</b></span>
+          <span style="color:var(--text-3)">Success <b style="color:var(--teal)">${a.success}%</b></span>
+          <span style="margin-left:auto;color:var(--text-3)">${icon('clock',12)} ${esc(a.lastActivity)}</span>
+        </div>
+      </div>`).join('')}
+    </div>
+    <div class="card card-pad" style="margin-top:16px">
+      <div class="card-title">${icon('layers',15)} Execution topology</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap;font-size:12.5px">
+        ${chip('Sequence Agent', 'chip-cyan')} <span style="color:var(--text-3)">→ routes subtasks →</span>
+        ${chip('LeadGen', 'chip-purple')} ${chip('+ Critique', 'chip-gray')} ${chip('DB', 'chip-teal')} ${chip('+ Critique', 'chip-gray')} ${chip('Email', 'chip-amber')} ${chip('+ Critique', 'chip-gray')}
+        <span style="color:var(--text-3)">· failures →</span> ${chip('Loop Agent (retry ≤ 3)', 'chip-amber')}
+      </div>
+    </div>
+  </div>`;
+});
+
+/* ============ SCREEN 8 — TEMPLATES ============ */
+route('templates', async (view) => {
+  const templates = await Backend.getTemplates();
+  view.innerHTML = `
+  <div class="fade-up">
+    <div class="page-head"><div><div class="page-title">Email Templates</div><div class="page-sub">Approved spines — Email Agent personalizes per lead via Bedrock</div></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="stagger">
+      ${templates.map(t => `<div class="card card-pad">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span class="ai-orb orb-cyan">${icon('mail',14)}</span><b>${esc(t.name)}</b><span class="chip chip-teal" style="margin-left:auto">approved</span></div>
+        <div style="background:#0E1930;border:1px solid var(--line-soft);border-radius:12px;padding:14px;font-size:12.5px;line-height:1.65;white-space:pre-wrap"><b style="color:var(--cyan)">${esc(t.subject)}</b>\n\n${esc(t.body.slice(0, 220))}…</div>
+        <button class="btn btn-primary" style="margin-top:14px" onclick="openWizard({});WIZ.template='${t.id}';WIZ.step=2;renderWizard()">${icon('bolt',14)} Use in new campaign</button>
+      </div>`).join('')}
+    </div>
+  </div>`;
+});
+
+/* ============ SCREEN 9 — SETTINGS ============ */
+route('settings', async (view) => {
+  view.innerHTML = `
+  <div class="fade-up" style="max-width:720px">
+    <div class="page-head"><div><div class="page-title">Settings</div><div class="page-sub">Workspace, model routing and delivery configuration</div></div></div>
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div class="card-title">${icon('settings',15)} Workspace</div>
+      <div class="field" style="margin-top:14px"><label>Workspace name</label><input value="MarMail Growth"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="field"><label>Default sender</label><input value="jordan@marmail.ai"></div>
+        <div class="field"><label>Region</label><select><option>us-east-1 (N. Virginia)</option><option>eu-west-1 (Ireland)</option></select></div>
+      </div>
+    </div>
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div class="card-title">${icon('cpu',15)} Bedrock Model Routing</div>
+      <div class="kv" style="margin-top:10px"><span>Sequence / Email agents</span><select style="width:220px"><option>Claude 3.7 Sonnet</option><option>Claude 3.5 Sonnet</option></select></div>
+      <div class="kv"><span>LeadGen agent</span><select style="width:220px"><option>Claude 3.5 Sonnet</option><option>Claude 3.7 Sonnet</option></select></div>
+      <div class="kv"><span>Critique + Loop agents</span><select style="width:220px"><option>Claude 3.5 Haiku (fast/cheap)</option><option>Claude 3.5 Sonnet</option></select></div>
+    </div>
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div class="card-title">${icon('send',15)} Delivery (Amazon SES)</div>
+      <div class="kv" style="margin-top:10px"><span>Daily sending quota</span><b>50,000 / day</b></div>
+      <div class="kv"><span>Throttle rate</span><b>14 emails / second</b></div>
+      <div class="kv"><span>Reputation score</span><b style="color:var(--teal)">98 / 100 — Healthy</b></div>
+    </div>
+    <div class="card card-pad" style="border-color:rgba(239,68,68,.3)">
+      <div class="card-title" style="color:var(--red)">${icon('trash',15)} Danger zone</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+        <span style="font-size:12.5px;color:var(--text-2)">Reset all demo data (campaigns, leads, runs)</span>
+        <button class="btn btn-danger" onclick="Backend.resetDemo()">Reset demo</button>
+      </div>
+    </div>
+  </div>`;
+});
+
+/* ============ BOOT ============ */
+renderSidebar(); renderHeader(); renderFooter();
+if (!location.hash) location.hash = '#/dashboard';
+router();
+</script>
+</body>
+</html>
