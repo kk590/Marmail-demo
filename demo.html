@@ -4,7 +4,8 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>MarMail — AI Multi-Agent Email Marketing on Amazon Bedrock AgentCore</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -186,6 +187,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .page-title{font-size:21px;font-weight:800;letter-spacing:-.02em}
 .page-sub{font-size:13px;color:var(--text-2);margin-top:3px}
 .tooltip{position:relative}
+.provider-card{border:1px solid var(--line-soft);border-radius:12px;padding:14px 16px;cursor:pointer;transition:all .18s;background:rgba(148,163,184,.03)}
+.provider-card:hover{border-color:rgba(0,212,255,.35)}
+.provider-card.on{border-color:rgba(0,212,255,.55);background:var(--cyan-dim);box-shadow:0 0 16px rgba(0,212,255,.12)}
+.provider-card .pc-name{font-weight:700;font-size:13px}
+.provider-card .pc-desc{font-size:11.5px;color:var(--text-3);margin-top:2px}
+.key-mask{font-family:var(--mono);letter-spacing:.08em}
 </style>
 </head>
 <body>
@@ -201,8 +208,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 <div id="modal-root"></div>
 <script>
 const Backend = (() => {
-  const DB_KEY = 'marmail_db_v3';
-  const listeners = {}; // event bus
+  const DB_KEY = 'marmail_db_v4';
+  const listeners = {};
   const on = (ev, fn) => { (listeners[ev] = listeners[ev] || []).push(fn); return () => { listeners[ev] = listeners[ev].filter(f => f !== fn); }; };
   const emit = (ev, data) => (listeners[ev] || []).forEach(fn => { try { fn(data); } catch (e) { console.error(e); } });
   const latency = (ms) => new Promise(r => setTimeout(r, ms + Math.random() * 120));
@@ -210,7 +217,6 @@ const Backend = (() => {
   const now = () => Date.now();
   const ago = (mins) => now() - mins * 60000;
 
-  /* ---------- data pools for procedural generation ---------- */
   const FIRST = ['Elena','Marcus','Priya','David','Sofia','James','Aisha','Tom','Nina','Oliver','Grace','Leo','Maya','Ethan','Isla','Noah','Zara','Lucas','Ivy','Henry','Ruby','Felix','Chloe','Omar','Lena','Victor','Anya','Julian','Tessa','Ravi','Mira','Kai','Freya','Diego','Hana','Theo','Ingrid','Sam','Lara','Owen'];
   const LAST = ['Vasquez','Chen','Sharma','Okafor','Lindqvist','Moreau','Tanaka','Novak','Silva','Kim','Haddad','Fischer','Rossi','Nakamura','Bergström','Dubois','Mehta','Petrov','Kowalski','Nguyen','Alvarez','Fitzgerald','Osei','Larsen','Romano','Weber','Costa','Ivanov','Sato','Mendes','Haas','Verma','Bakker','Klein','Santos','Reyes','Marek','Lund','Adeyemi','Brooks'];
   const COMPANIES = { 'SaaS / Software': ['NimbusIQ','Flowstack','Quantiva','Brightloom','Hexafold','Cloudhaven','Dataweave','Kitebase','Stratosly','Vektorly','Pulsegrid','Orbitlane'], 'Fintech': ['Ledgerly','Paystride','Vaultora','Finchpay','Clearcoin','Trustline','Meridian Pay'], 'Healthcare Tech': ['Medlyra','Carepointe','Vitalsync','Healthgrid','Neurospark'], 'E-commerce': ['Cartloop','Vendora','Shopwire','Mergely','Parcelpay'], 'AI / ML': ['Synthmind','Neuralis','Promptbase','Cognivia','Latentspace'], 'DevTools': ['Gitstream','Deploykit','Apipulse','Containerly','Buildhive'] };
@@ -236,7 +242,6 @@ const Backend = (() => {
     };
   }
 
-  /* ---------- seed database ---------- */
   function seed() {
     const t = now();
     const c1crit = { industry: 'SaaS / Software', companySize: '51-200', location: 'San Francisco, US', jobTitle: 'VP Engineering', maxLeads: 120 };
@@ -267,8 +272,8 @@ const Backend = (() => {
         { id: 'AG_SEQ', name: 'Sequence Agent', role: 'Orchestrates the full pipeline — decomposes goals, routes work, aggregates results from all worker agents.', model: 'Claude 3.7 Sonnet', status: 'Active', lastActivity: '2 min ago', runs: 128, success: 98.4 },
         { id: 'AG_LEAD', name: 'LeadGen Agent', role: 'Searches Apollo, LinkedIn & web crawls to discover and enrich ICP-matched leads.', model: 'Claude 3.5 Sonnet', status: 'Active', lastActivity: '2 min ago', runs: 342, success: 96.1 },
         { id: 'AG_CRIT', name: 'LeadGen Critique Agent', role: 'Adversarial reviewer — validates lead quality, flags off-ICP records, issues PASS / FAIL verdicts.', model: 'Claude 3.5 Haiku', status: 'Active', lastActivity: '3 min ago', runs: 342, success: 91.7 },
-        { id: 'AG_DB', name: 'DB Agent', role: 'Writes validated leads to the Aurora cluster, dedupes against existing records, validates email syntax.', model: 'Claude 3.5 Haiku', status: 'Active', lastActivity: '4 min ago', runs: 318, success: 99.2 },
-        { id: 'AG_EMAIL', name: 'Email Agent', role: 'Personalizes copy per-lead via Bedrock, manages throttled SES dispatch and tracks delivery events.', model: 'Claude 3.7 Sonnet', status: 'Active', lastActivity: '1 min ago', runs: 205, success: 97.8 },
+        { id: 'AG_DB', name: 'DB Agent', role: 'Writes validated leads to the CockroachDB cluster, dedupes against existing records, validates email syntax.', model: 'Claude 3.5 Haiku', status: 'Active', lastActivity: '4 min ago', runs: 318, success: 99.2 },
+        { id: 'AG_EMAIL', name: 'Email Agent', role: 'Personalizes copy per-lead via Bedrock, manages throttled dispatch via configured email provider and tracks delivery events.', model: 'Claude 3.7 Sonnet', status: 'Active', lastActivity: '1 min ago', runs: 205, success: 97.8 },
         { id: 'AG_LOOP', name: 'Loop Agent', role: 'Failure recovery specialist — re-queues failed subtasks, escalates after 3 retries, keeps the graph converging.', model: 'Claude 3.5 Haiku', status: 'Standby', lastActivity: '12 min ago', runs: 57, success: 88.3 }
       ],
       notifications: [
@@ -281,31 +286,59 @@ const Backend = (() => {
         { id: 'outreach_a', name: 'Warm Intro — Pain-Led', subject: 'Scaling {{company}}\'s pipeline without growing headcount', body: 'Hi {{first_name}},\n\nNoticed {{company}} is hiring aggressively on the engineering side — usually a sign the GTM stack is feeling the strain.\n\nWe help teams like yours automate outbound with AI agents that research, personalize and send at scale (currently 3.2x reply rates vs. static sequences).\n\nWorth a 15-minute look at how this would map to {{company}}\'s stack?\n\nBest,\nJordan Avery\nVP Growth, MarMail' },
         { id: 'outreach_b', name: 'Direct Value — Metric First', subject: '{{first_name}}, how {{company}} can cut CAC 40% this quarter', body: 'Hi {{first_name}},\n\nTeams at {{company_size}}-person {{industry}} companies typically spend 20+ hrs/week on manual prospecting.\n\nMarMail\'s AgentCore fleet handles research, enrichment and personalized sends end-to-end — most customers see replies within 48 hours of launch.\n\nOpen to a quick benchmark for {{company}}?\n\nCheers,\nJordan Avery\nVP Growth, MarMail' }
       ],
-      runs: {} // active run state per campaign
+      runs: {},
+      settings: {
+        workspaceName: 'MarMail Growth',
+        defaultSender: 'jordan@marmail.ai',
+        region: 'us-east-1',
+        dbUrl: 'postgresql://demo:demo@cockroachdb-cluster-demo.marmail.aws:26257/marmail?sslmode=verify-full',
+        emailProvider: 'ses',
+        emailProviders: {
+          ses: { enabled: true, region: 'us-east-1', configurationSet: 'marmail-outbound' },
+          sendgrid: { enabled: false, apiKey: '' },
+          mailgun: { enabled: false, apiKey: '', domain: '' },
+          postmark: { enabled: false, serverToken: '' },
+          custom: { enabled: false, host: '', port: 587, username: '', password: '', secure: true, fromOverride: '' }
+        },
+        llmKeys: {
+          anthropic: '',
+          openai: '',
+          google: '',
+          azureOpenAI: '',
+          customEndpoint: '',
+          customApiKey: ''
+        },
+        modelRouting: {
+          sequenceEmail: 'Claude 3.7 Sonnet',
+          leadgen: 'Claude 3.5 Sonnet',
+          critiqueLoop: 'Claude 3.5 Haiku (fast/cheap)'
+        },
+        delivery: {
+          dailyQuota: 50000,
+          throttleRate: 14,
+          reputation: 98
+        }
+      }
     };
   }
 
   let db;
   try { db = JSON.parse(localStorage.getItem(DB_KEY)); } catch (e) { db = null; }
-  if (!db || !db.campaigns) { db = seed(); persist(); }
+  if (!db || !db.campaigns || !db.settings) { db = seed(); persist(); }
   function persist() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch (e) {} }
 
-  /* ---------- helpers ---------- */
   const campaignById = (id) => db.campaigns.find(c => c.id === id);
   const money = (n) => '$' + n.toFixed(2);
   const tok = (n) => n > 999 ? (n / 1000).toFixed(1) + 'k' : n;
   const totals = () => db.campaigns.reduce((a, c) => ({ sent: a.sent + c.stats.sent, bounced: a.bounced + c.stats.bounced, failed: a.failed + c.stats.failed, cost: a.cost + c.cost.usd, tokens: a.tokens + c.cost.tokens, fetched: a.fetched + c.stats.fetched }), { sent: 0, bounced: 0, failed: 0, cost: 0, tokens: 0, fetched: 0 });
 
-  /* =====================================================================
-     AGENT ORCHESTRATION ENGINE — simulates the Bedrock AgentCore graph
-     ===================================================================== */
   const TOKEN_RATE = { 'Claude 3.7 Sonnet': 0.000018, 'Claude 3.5 Sonnet': 0.000015, 'Claude 3.5 Haiku': 0.000004 };
   const CRIT_FAIL_RATE = 0.16;
 
   function log(run, level, msg, tokens) {
     run.logs.push({ t: now(), level, msg, tokens: tokens || 0 });
     run.tokens += tokens || 0;
-    run.cost += (tokens || 0) * 0.000008; // blended input+output
+    run.cost += (tokens || 0) * 0.000008;
     emit('run-log', { campaignId: run.campaignId, line: run.logs[run.logs.length - 1] });
   }
   const setPhase = (run, phase, nodeState) => {
@@ -325,6 +358,7 @@ const Backend = (() => {
 
     const wait = (ms) => new Promise(r => setTimeout(r, ms));
     const agent = (id) => db.agents.find(a => a.id === id);
+    const providerLabel = { ses: 'Amazon SES', sendgrid: 'SendGrid', mailgun: 'Mailgun', postmark: 'Postmark', custom: 'Custom SMTP' }[db.settings.emailProvider] || 'Amazon SES';
 
     await wait(700);
     setPhase(run, 'sequence', { seq: 'running' });
@@ -336,7 +370,6 @@ const Backend = (() => {
     setPhase(run, 'leadgen', { seq: 'success', leadgen: 'running' });
     agent('AG_SEQ').lastActivity = 'just now';
 
-    /* ---- LeadGen module with Critique + Loop ---- */
     let fetched = [], attempts = 0;
     while (fetched.length < run.leadsTarget && attempts < 3) {
       attempts++;
@@ -370,9 +403,9 @@ const Backend = (() => {
     agent('AG_LEAD').lastActivity = 'just now'; agent('AG_CRIT').lastActivity = 'just now';
     log(run, 'ok', `LeadGen module complete — ${fetched.length} leads in handoff buffer`, 500);
 
-    /* ---- DB module with Critique + Loop ---- */
     setPhase(run, 'db', { db: 'running' });
-    log(run, 'agent', `▸ DB Agent connecting to Aurora PostgreSQL (cluster: marmail-prod)`, 800);
+    log(run, 'agent', `▸ DB Agent connecting to CockroachDB cluster (marmail-prod)`, 800);
+    log(run, 'info', `  cluster: ${db.settings.dbUrl.split('@')[1]?.split('/')[0] || 'cockroachdb-cluster-demo.marmail.aws:26257'}`, 0);
     await wait(900);
     let dupes = 0, written = 0;
     for (let b = 0; b < 5; b++) {
@@ -401,10 +434,10 @@ const Backend = (() => {
     log(run, 'ok', `DB module complete — ${sendable.length} sendable leads (${dupes} duplicates removed)`, 400);
     agent('AG_DB').lastActivity = 'just now';
 
-    /* ---- Email module with Critique + Loop ---- */
     setPhase(run, 'email', { email: 'running' });
     const tpl = db.templates.find(t => t.id === c.template) || db.templates[0];
     log(run, 'agent', `▸ Email Agent loading template "${tpl.name}" · rendering via Bedrock`, 950);
+    log(run, 'info', `  delivery provider: ${providerLabel}`, 0);
     await wait(900);
     let sent = 0, bounced = 0, failed = 0;
     const batches = Math.ceil(sendable.length / 12);
@@ -416,10 +449,9 @@ const Backend = (() => {
         if (r < .045) bounced++; else if (r < .06) failed++; else sent++;
       });
       run.emailsDone += slice.length;
-      c.stats.sent += slice.filter(() => true).length - 0; // updated below on completion
       setPhase(run, 'email', {});
       emit('run-progress', { campaignId, module: 'email', done: run.emailsDone, total: sendable.length });
-      log(run, 'info', `  SES dispatch batch ${b + 1}/${batches} → ${slice.length} sent (throttle 14/s)`, 0);
+      log(run, 'info', `  ${providerLabel} dispatch batch ${b + 1}/${batches} → ${slice.length} sent (throttle ${db.settings.delivery.throttleRate}/s)`, 0);
     }
     setPhase(run, 'email_crit', { email: 'success', email_crit: 'running' });
     await wait(1000);
@@ -430,7 +462,6 @@ const Backend = (() => {
     setPhase(run, 'email_crit', { email_crit: emVerdict === 'PASS' ? 'success' : 'failed' });
     if (emVerdict === 'FAIL') { run.retries.email++; log(run, 'warn', `↻ Loop Agent engaged — pausing dispatch, warming domain reputation`, 350); agent('AG_LOOP').status = 'Active'; agent('AG_LOOP').lastActivity = 'just now'; await wait(1200); }
 
-    /* ---- finalize ---- */
     c.stats.fetched += fetched.length; c.stats.sent += sent; c.stats.bounced += bounced; c.stats.failed += failed;
     c.stats.opened += Math.round(sent * (.42 + Math.random() * .18));
     c.stats.clicked += Math.round(sent * (.14 + Math.random() * .08));
@@ -445,7 +476,6 @@ const Backend = (() => {
     setTimeout(() => { agent('AG_LOOP').status = 'Standby'; persist(); emit('db', { type: 'agents' }); }, 8000);
   }
 
-  /* ---------- public API (simulated REST) ---------- */
   return {
     on, emit, money, tok,
     async getDashboard() { await latency(180); const t = totals(); return { campaigns: db.campaigns.length, fetched: db.leads.length + t.fetched, sent: t.sent, avgCost: db.campaigns.filter(c => c.cost.usd > 0).length ? t.cost / db.campaigns.filter(c => c.cost.usd > 0).length : 0, totals }; },
@@ -456,6 +486,18 @@ const Backend = (() => {
     async getAgents() { await latency(140); return db.agents; },
     async getTemplates() { await latency(100); return db.templates; },
     async getNotifications() { await latency(80); return db.notifications.slice(0, 8); },
+    async getSettings() { await latency(90); return JSON.parse(JSON.stringify(db.settings)); },
+    async updateSettings(patch) {
+      await latency(220);
+      db.settings = Object.assign({}, db.settings, patch);
+      if (patch.emailProviders) db.settings.emailProviders = Object.assign({}, db.settings.emailProviders, patch.emailProviders);
+      if (patch.llmKeys) db.settings.llmKeys = Object.assign({}, db.settings.llmKeys, patch.llmKeys);
+      if (patch.modelRouting) db.settings.modelRouting = Object.assign({}, db.settings.modelRouting, patch.modelRouting);
+      if (patch.delivery) db.settings.delivery = Object.assign({}, db.settings.delivery, patch.delivery);
+      persist();
+      emit('db', { type: 'settings' });
+      return db.settings;
+    },
     async createCampaign(payload) {
       await latency(420);
       const c = { id: uid('CMP'), name: payload.name, criteria: payload.criteria, template: payload.template, status: 'Draft', stats: { fetched: 0, sent: 0, opened: 0, clicked: 0, bounced: 0, failed: 0 }, cost: { usd: 0, tokens: 0 }, createdAt: now() };
@@ -466,7 +508,7 @@ const Backend = (() => {
       await latency(300);
       const c = campaignById(id); if (!c || c.status === 'Running') return c;
       c.status = 'Queued'; c.startedAt = now(); persist(); emit('db', { type: 'campaign', campaign: c });
-      orchestrate(id); // fire-and-forget like a real async job
+      orchestrate(id);
       return c;
     },
     async deleteCampaign(id) { await latency(220); db.campaigns = db.campaigns.filter(c => c.id !== id); delete db.runs[id]; persist(); emit('db', { type: 'campaigns' }); return { ok: true }; },
@@ -476,11 +518,9 @@ const Backend = (() => {
     _db: () => db, _persist: persist
   };
 })();
-</script><script>
-/* =====================================================================
-   FRONTEND APP
-   ===================================================================== */
-const AVATAR = "data:image/png;base64,__AVATAR_B64__";
+</script>
+<script>
+const AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='68' height='68' viewBox='0 0 68 68'%3E%3Crect width='68' height='68' rx='34' fill='%230E1930'/%3E%3Ccircle cx='34' cy='26' r='12' fill='%2300D4FF' opacity='.85'/%3E%3Cpath d='M14 58c4-12 12-18 20-18s16 6 20 18' fill='%238B5CF6' opacity='.9'/%3E%3C/svg%3E";
 const LOGO_SVG = `<svg width="34" height="34" viewBox="0 0 34 34" fill="none"><rect x="2" y="2" width="30" height="30" rx="8" fill="#0E1930" stroke="#00D4FF" stroke-width="1.4"/><path d="M8 12L17 19L26 12" stroke="#00D4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="17" cy="22" r="2.6" fill="#8B5CF6"/><path d="M9.5 24.5C9.5 24.5 13 26.2 17 26.2C21 26.2 24.5 24.5 24.5 24.5" stroke="#00D4FF" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
 const ICONS = {
@@ -518,18 +558,19 @@ const ICONS = {
   dollar: '<svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>',
   target: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></svg>',
   arrowUR: '<svg viewBox="0 0 24 24"><path d="M7 17L17 7M7 7h10v10"/></svg>',
-  info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>'
+  info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>',
+  key: '<svg viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>',
+  server: '<svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>'
 };
 const icon = (n, s) => `<span style="display:inline-flex;width:${s||16}px;height:${s||16}px;flex-shrink:0">${ICONS[n].replace('<svg', `<svg width="100%" height="100%"`)}</span>`;
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const timeAgo = (ts) => { if (!ts) return '—'; const m = Math.floor((Date.now() - ts) / 60000); if (m < 1) return 'just now'; if (m < 60) return m + ' min ago'; const h = Math.floor(m / 60); if (h < 24) return h + 'h ago'; return Math.floor(h / 24) + 'd ago'; };
-const fmtDate = (ts) => new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: ts && false ? undefined : undefined }) + ', ' + new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const fmtDate = (ts) => new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 const pct = (a, b) => b ? ((a / b) * 100).toFixed(1) + '%' : '—';
 
 const STATUS_CHIP = { Draft: 'chip-gray', Queued: 'chip-amber', Running: 'chip-cyan', Sending: 'chip-cyan', Completed: 'chip-teal', Failed: 'chip-red', Paused: 'chip-amber' };
 const chip = (label, cls, dot) => `<span class="chip ${cls}">${dot === false ? '' : '<span class="cdot"></span>'}${esc(label)}</span>`;
 
-/* ---------- toast ---------- */
 function toast(msg, type) {
   const t = document.createElement('div');
   t.className = 'toast ' + (type || '');
@@ -538,7 +579,6 @@ function toast(msg, type) {
   setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 350); }, 4200);
 }
 
-/* ---------- canvas chart helpers ---------- */
 function lineChart(canvas, series, labels, color) {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth, h = canvas.clientHeight;
@@ -547,18 +587,14 @@ function lineChart(canvas, series, labels, color) {
   const max = Math.max(...series) * 1.15 || 1;
   const pad = 8, stepX = (w - pad * 2) / (series.length - 1);
   const pts = series.map((v, i) => [pad + i * stepX, h - pad - (v / max) * (h - pad * 2)]);
-  // grid
   ctx.strokeStyle = 'rgba(148,163,184,.08)'; ctx.lineWidth = 1;
   for (let i = 1; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, (h / 4) * i); ctx.lineTo(w, (h / 4) * i); ctx.stroke(); }
-  // area
   const grad = ctx.createLinearGradient(0, 0, 0, h);
   grad.addColorStop(0, color + '44'); grad.addColorStop(1, color + '00');
   ctx.beginPath(); ctx.moveTo(pts[0][0], h - pad); pts.forEach(p => ctx.lineTo(p[0], p[1])); ctx.lineTo(pts[pts.length - 1][0], h - pad); ctx.closePath();
   ctx.fillStyle = grad; ctx.fill();
-  // line
   ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
   ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.shadowColor = color; ctx.shadowBlur = 8; ctx.stroke(); ctx.shadowBlur = 0;
-  // dots
   pts.forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 2.4, 0, 7); ctx.fillStyle = color; ctx.fill(); });
 }
 function barChart(canvas, series, labels, colors) {
@@ -579,9 +615,6 @@ function barChart(canvas, series, labels, colors) {
   });
 }
 
-/* =====================================================================
-   LAYOUT — sidebar / header / footer
-   ===================================================================== */
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
   { id: 'campaigns', label: 'Campaigns', icon: 'campaigns' },
@@ -634,9 +667,6 @@ function renderFooter() {
 }
 setInterval(async () => { const d = await Backend.getDashboard(); const el = document.getElementById('foot-tokens'); if (el) el.textContent = Backend.tok(d.totals.tokens) + ' tokens · ' + Backend.money(d.totals.cost) + ' session cost'; }, 5000);
 
-/* =====================================================================
-   ROUTER
-   ===================================================================== */
 const routes = {};
 function route(id, fn) { routes[id] = fn; }
 async function router() {
@@ -650,7 +680,8 @@ async function router() {
   renderSidebar();
 }
 window.addEventListener('hashchange', router);
-</script><script>
+</script>
+<script>
 /* =====================================================================
    SCREEN 1 — DASHBOARD
    ===================================================================== */
@@ -691,7 +722,6 @@ route('dashboard', async (view) => {
           <svg width="100%" height="14" style="position:absolute;top:29px;left:0;overflow:visible;z-index:0"><line x1="9%" y1="7" x2="91%" y2="7" stroke="rgba(0,212,255,.25)" stroke-width="1.5" stroke-dasharray="4 5"><animate attributeName="stroke-dashoffset" from="18" to="0" dur="1.2s" repeatCount="indefinite"/></svg>
           <div style="display:flex;justify-content:space-between;position:relative;z-index:1">
             ${['Sequence Agent', 'LeadGen', 'DB Store', 'Email Dispatch'].map((s, i) => {
-              const st = i === 0 ? 'done' : i <= running.length + 0 && running.length ? (i === 1 ? 'run' : 'wait') : (i === 1 && !running.length ? 'idle' : 'wait');
               const glow = running.length && i === 1;
               return `<div style="text-align:center;width:110px"><div class="ai-orb ${glow ? 'orb-cyan' : i === 0 ? 'orb-teal' : ''}" style="width:56px;height:56px;border-radius:16px;margin:0 auto 8px;border:1px solid ${glow ? 'rgba(0,212,255,.6)' : 'var(--line-soft)'};background:var(--surface-2);${glow ? 'box-shadow:0 0 22px rgba(0,212,255,.4)' : ''}">${glow ? '<div class="spinner" style="width:20px;height:20px"></div>' : icon(i === 0 ? 'spark' : i === 1 ? 'target' : i === 2 ? 'db' : 'mail', 22)}</div><div style="font-size:11.5px;font-weight:600">${s}</div><div style="font-size:10px;color:${glow ? 'var(--cyan)' : i === 0 ? 'var(--teal)' : 'var(--text-3)'};margin-top:2px">${glow ? 'processing' : i === 0 ? 'complete' : 'standby'}</div></div>`;
             }).join('')}
@@ -729,10 +759,7 @@ route('dashboard', async (view) => {
   </div>`;
 
   const tokens = [42, 55, 48, 71, 63, 89, 95, 82, 104, 96, 121, 132, 118, Math.max(90, Math.round(dash.totals.tokens / 1000))];
-  const cost = tokens.map(v => +(v * 0.011).toFixed(2));
   lineChart(document.getElementById('dash-chart'), tokens, null, '#00D4FF');
-  // overlay cost as thin purple line
-  const c2 = document.getElementById('dash-chart'), ctx = c2.getContext('2d');
 });
 
 /* =====================================================================
@@ -778,6 +805,11 @@ async function deleteCampaign(id) {
 /* =====================================================================
    SCREEN 3 — CAMPAIGN CREATOR WIZARD
    ===================================================================== */
+const COMPANY_LIST = { 'SaaS / Software':1, 'Fintech':1, 'Healthcare Tech':1, 'E-commerce':1, 'AI / ML':1, 'DevTools':1 };
+const SIZE_LABEL = { '1-50':'Startup (1–50)', '51-200':'Growth (51–200)', '201-1000':'Scale-up (201–1k)', '1000+':'Enterprise (1k+)' };
+const LOCS = ['San Francisco, US','New York, US','Austin, US','London, UK','Berlin, DE','Amsterdam, NL','Toronto, CA','Singapore','Sydney, AU','Bangalore, IN','Tel Aviv, IL','Stockholm, SE','Paris, FR','Dublin, IE'];
+const TITLE_BY = { 'VP Engineering':1, 'CTO':1, 'Head of Growth':1, 'CPO':1, 'Engineering Manager':1 };
+
 const WIZ = { step: 1, criteria: { industry: 'SaaS / Software', companySize: '51-200', location: 'San Francisco, US', jobTitle: 'VP Engineering', maxLeads: 100 }, template: 'outreach_a', name: '' };
 function openWizard(prefill) {
   if (prefill) WIZ.criteria = Object.assign({}, WIZ.criteria, prefill);
@@ -853,7 +885,7 @@ async function renderWizard() {
           <div style="background:#0E1930;border:1px solid var(--line-soft);border-radius:14px;overflow:hidden">
             <div style="padding:12px 16px;border-bottom:1px solid var(--line-soft);display:flex;gap:10px;align-items:center"><span style="color:var(--text-3)">${icon('mail', 15)}</span><span style="font-size:12.5px;color:var(--text-2)" id="pv-subject">${esc(personalize(tpl.subject))}</span></div>
             <div style="padding:18px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text)" id="pv-body">${esc(personalize(tpl.body))}</div>
-            <div style="padding:10px 18px;border-top:1px dashed var(--line-soft);font-size:11px;color:var(--text-3)">To: elena.vasquez@nimbusiq.io · From: jordan@marmail.ai · DKIM signed via SES</div>
+            <div style="padding:10px 18px;border-top:1px dashed var(--line-soft);font-size:11px;color:var(--text-3)">To: elena.vasquez@nimbusiq.io · From: jordan@marmail.ai · DKIM signed</div>
           </div>
           <div style="margin-top:14px;font-size:12px;color:var(--text-3);display:flex;gap:8px;align-items:center">${icon('info', 14)} Preview renders a sample lead — the Email Agent personalizes every record individually at send time.</div>
         </div>
@@ -861,9 +893,8 @@ async function renderWizard() {
     </div>
   </div>`;
 
-  // bindings
   const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('change', fn); };
-  bind('w-industry', e => { c.industry = e.target.value; syncPreview(); });
+  bind('w-industry', e => { c.industry = e.target.value; });
   bind('w-size', e => { c.companySize = e.target.value; });
   bind('w-loc', e => { c.location = e.target.value; });
   bind('w-tpl', e => { w.template = e.target.value; renderWizard(); });
@@ -883,7 +914,6 @@ function syncPreview() {
 }
 function autoName() { const c = WIZ.criteria; return `${new Date().toLocaleDateString('en-US', { month: 'short' })} ${c.industry.split(' ')[0]} — ${c.jobTitle} Wave`; }
 function wizNav(dir) {
-  if (WIZ.step === 2) { const s = document.getElementById('w-subj'), b = document.getElementById('w-body'); if (s) Backend._db().templates.find(t => t.id === WIZ.template)._subj = 1; }
   WIZ.step = Math.min(3, Math.max(1, WIZ.step + dir)); renderWizard();
 }
 async function wizLaunch() {
@@ -896,7 +926,8 @@ async function wizLaunch() {
   await Backend.launchCampaign(c.id);
   navTo('run', c.id);
 }
-</script><script>
+</script>
+<script>
 /* =====================================================================
    SCREEN 4 — LIVE AGENT ORCHESTRATION
    ===================================================================== */
@@ -909,9 +940,9 @@ route('run', async (view, campaignId) => {
     seq: { label: 'Sequence Agent', sub: 'Orchestrator', orb: 'orb-cyan', i: 'spark' },
     leadgen: { label: 'LeadGen', sub: 'Discovery + Enrichment', orb: 'orb-purple', i: 'target' },
     leadgen_crit: { label: 'Critique', sub: 'ICP gate', orb: 'orb-purple', i: 'shield', mini: true },
-    db: { label: 'DB Module', sub: 'Aurora upsert + dedupe', orb: 'orb-teal', i: 'db' },
+    db: { label: 'DB Module', sub: 'CockroachDB upsert + dedupe', orb: 'orb-teal', i: 'db' },
     db_crit: { label: 'Critique', sub: 'Schema gate', orb: 'orb-teal', i: 'shield', mini: true },
-    email: { label: 'Email Module', sub: 'Bedrock render + SES', orb: 'orb-amber', i: 'mail' },
+    email: { label: 'Email Module', sub: 'Bedrock render + provider', orb: 'orb-amber', i: 'mail' },
     email_crit: { label: 'Critique', sub: 'Delivery gate', orb: 'orb-amber', i: 'shield', mini: true },
     loop: { label: 'Loop Agent', sub: 'Recovery', orb: 'orb-cyan', i: 'refresh' }
   };
@@ -1023,11 +1054,11 @@ route('run', async (view, campaignId) => {
   });
   const offProg = Backend.on('run-progress', ({ campaignId: cid, module, done, total }) => { if (cid !== campaignId) return; progress[module] = { t: total, d: done }; if (module === 'email' && !progress.db.t) { progress.db = { t: total, d: total }; } if (module === 'email') setPg('db'); setPg(module); });
   const offDone = Backend.on('run-done', ({ campaignId: cid }) => { if (cid !== campaignId) return; toast('Run complete — results ready', 'ok'); setTimeout(() => navTo('results', cid), 1600); });
-  const origRouter = router;
   const cleanup = () => { offLog(); offState(); offProg(); offDone(); };
   const obs = setInterval(() => { if (location.hash.indexOf('run/' + campaignId) !== 0 && location.hash !== '#/run/' + campaignId) { cleanup(); clearInterval(obs); } }, 800);
 });
-</script><script>
+</script>
+<script>
 /* ============ SCREEN 5 — LEADS DATABASE ============ */
 let LEAD_SEL = new Set();
 route('leads', async (view) => {
@@ -1044,7 +1075,7 @@ route('leads', async (view) => {
       <div class="search-wrap" style="width:280px">${icon('search')}<input id="lead-search" placeholder="Search name, email, company…"></div>
       <select id="lead-source"><option value="">All sources</option>${sources.map(s=>`<option>${s}</option>`).join('')}</select>
       <div class="chip-select" id="lead-status-f">${['','New','Qualified','Contacted'].map(s=>`<button class="sel-chip ${s===''?'on':''}" data-s="${s}">${s||'All statuses'}</button>`).join('')}</div>
-      <div id="bulk-bar" style="display:none;margin-left:auto;display:none;align-items:center;gap:8px">
+      <div id="bulk-bar" style="display:none;margin-left:auto;align-items:center;gap:8px">
         <span class="chip chip-cyan" id="bulk-count">0 selected</span>
         <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="bulkAction('qualified')">Mark qualified</button>
         <button class="btn btn-ghost" style="padding:6px 12px;font-size:12px" onclick="bulkAction('contacted')">Mark contacted</button>
@@ -1090,17 +1121,15 @@ function exportLeads() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'marmail-leads.csv'; a.click();
 }
 
-/* ============ SCREEN 6 — CAMPAIGN RESULTS / EMAIL PERFORMANCE ============ */
+/* ============ SCREEN 6 — CAMPAIGN RESULTS ============ */
 route('results', async (view, id) => {
   const c = await Backend.getCampaign(id);
   if (!c) { view.innerHTML = `<div class="empty-state"><h3 style="color:var(--text)">Campaign not found</h3></div>`; return; }
   const s = c.stats, del = s.sent + s.bounced + s.failed;
   const seedN = [...c.id].reduce((a, ch) => a + ch.charCodeAt(0), 0);
   const rnd = (i) => { const x = Math.sin(seedN + i * 91) * 10000; return x - Math.floor(x); };
-  const statuses = ['Delivered', 'Opened', 'Clicked', 'Bounced', 'Failed'];
   const logRows = Array.from({ length: Math.min(12, Math.max(4, Math.round(del / 9))) }, (_, i) => {
-    const r = rnd(i); const st = r < .78 ? (r < .5 ? 'Delivered' : r < .62 ? 'Opened' : 'Clicked') : r < .92 ? 'Bounced' : 'Failed';
-    return st;
+    const r = rnd(i); return r < .78 ? (r < .5 ? 'Delivered' : r < .62 ? 'Opened' : 'Clicked') : r < .92 ? 'Bounced' : 'Failed';
   });
   view.innerHTML = `
   <div class="fade-up">
@@ -1142,7 +1171,7 @@ route('results', async (view, id) => {
       ${logRows.map((st, i) => `<tr>
         <td class="mono" style="font-size:12px">${(Backend._db().leads[i]||{email:'lead'+i+'@example.io'}).email}</td>
         <td>${chip(st, st==='Delivered'?'chip-teal':st==='Opened'?'chip-cyan':st==='Clicked'?'chip-purple':st==='Bounced'?'chip-amber':'chip-red')}</td>
-        <td style="font-size:12px;color:var(--text-2)">${st==='Bounced'?'550 5.1.1 mailbox unavailable':st==='Failed'?'SES throttling retry exhausted':st==='Clicked'?'CTA link visited · +reply intent':'250 OK · 0.31s'}</td>
+        <td style="font-size:12px;color:var(--text-2)">${st==='Bounced'?'550 5.1.1 mailbox unavailable':st==='Failed'?'throttling retry exhausted':st==='Clicked'?'CTA link visited · +reply intent':'250 OK · 0.31s'}</td>
         <td style="font-size:12px;color:var(--text-3)">${fmtDate((c.startedAt||c.createdAt) + i * 47000)}</td></tr>`).join('')}
       </tbody></table>
     </div>
@@ -1201,43 +1230,219 @@ route('templates', async (view) => {
   </div>`;
 });
 
-/* ============ SCREEN 9 — SETTINGS ============ */
+/* ============ SCREEN 9 — SETTINGS (enhanced) ============ */
 route('settings', async (view) => {
+  const s = await Backend.getSettings();
+  const providers = [
+    { id: 'ses', name: 'Amazon SES', desc: 'Native AWS · high deliverability · configuration sets' },
+    { id: 'sendgrid', name: 'SendGrid', desc: 'Twilio SendGrid API · global scale' },
+    { id: 'mailgun', name: 'Mailgun', desc: 'Transactional + marketing · EU/US regions' },
+    { id: 'postmark', name: 'Postmark', desc: 'Transactional focus · excellent inbox placement' },
+    { id: 'custom', name: 'Custom SMTP', desc: 'Any SMTP relay · host / port / credentials' }
+  ];
+
   view.innerHTML = `
-  <div class="fade-up" style="max-width:720px">
-    <div class="page-head"><div><div class="page-title">Settings</div><div class="page-sub">Workspace, model routing and delivery configuration</div></div></div>
+  <div class="fade-up" style="max-width:820px;padding-bottom:40px">
+    <div class="page-head">
+      <div><div class="page-title">Settings</div><div class="page-sub">Workspace, database, email providers, optional LLM keys & delivery</div></div>
+      <button class="btn btn-primary" id="settings-save">${icon('check',15)} Save changes</button>
+    </div>
+
+    <!-- Workspace -->
     <div class="card card-pad" style="margin-bottom:16px">
       <div class="card-title">${icon('settings',15)} Workspace</div>
-      <div class="field" style="margin-top:14px"><label>Workspace name</label><input value="MarMail Growth"></div>
+      <div class="field" style="margin-top:14px"><label>Workspace name</label><input id="s-workspace" value="${esc(s.workspaceName)}"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        <div class="field"><label>Default sender</label><input value="jordan@marmail.ai"></div>
-        <div class="field"><label>Region</label><select><option>us-east-1 (N. Virginia)</option><option>eu-west-1 (Ireland)</option></select></div>
+        <div class="field"><label>Default sender</label><input id="s-sender" value="${esc(s.defaultSender)}"></div>
+        <div class="field"><label>Region</label><select id="s-region"><option ${s.region==='us-east-1'?'selected':''}>us-east-1 (N. Virginia)</option><option ${s.region==='eu-west-1'?'selected':''}>eu-west-1 (Ireland)</option><option ${s.region==='us-west-2'?'selected':''}>us-west-2 (Oregon)</option></select></div>
       </div>
     </div>
+
+    <!-- Database (CockroachDB) -->
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div class="card-title">${icon('db',15)} Database — CockroachDB</div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span class="chip chip-teal"><span class="cdot"></span>Connected</span>
+        <span class="chip chip-gray">demo cluster</span>
+        <span style="font-size:12px;color:var(--text-3)">DB Agent writes validated leads here</span>
+      </div>
+      <div class="field" style="margin-top:14px">
+        <label>Cluster connection URL <span style="color:var(--text-3);font-weight:400">(stored in demo localStorage)</span></label>
+        <input id="s-dburl" class="mono" style="font-size:12px" value="${esc(s.dbUrl)}" spellcheck="false">
+        <div class="hint">Demo CockroachDB cluster URL. In production this would be a secure secret; here it is persisted with the rest of the demo state.</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px">
+        <div class="kv" style="border:none;padding:6px 0"><span style="color:var(--text-3)">Driver</span><b>pgx / PostgreSQL wire</b></div>
+        <div class="kv" style="border:none;padding:6px 0"><span style="color:var(--text-3)">Port</span><b class="mono">26257</b></div>
+      </div>
+    </div>
+
+    <!-- Email Providers -->
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div class="card-title">${icon('mail',15)} Email Providers</div>
+      <div class="hint" style="margin:8px 0 14px">Select the primary delivery provider used by the Email Agent. Custom SMTP supports any relay.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="provider-grid">
+        ${providers.map(p => `
+          <div class="provider-card ${s.emailProvider === p.id ? 'on' : ''}" data-provider="${p.id}">
+            <div class="pc-name">${p.name}</div>
+            <div class="pc-desc">${p.desc}</div>
+          </div>`).join('')}
+      </div>
+
+      <!-- Provider-specific panels -->
+      <div id="provider-panels" style="margin-top:18px">
+        <div id="panel-ses" style="display:${s.emailProvider==='ses'?'block':'none'}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="field"><label>SES region</label><input id="s-ses-region" value="${esc(s.emailProviders.ses.region)}"></div>
+            <div class="field"><label>Configuration set</label><input id="s-ses-config" value="${esc(s.emailProviders.ses.configurationSet)}"></div>
+          </div>
+        </div>
+        <div id="panel-sendgrid" style="display:${s.emailProvider==='sendgrid'?'block':'none'}">
+          <div class="field"><label>SendGrid API key</label><input id="s-sg-key" type="password" class="key-mask" placeholder="SG.••••••••" value="${esc(s.emailProviders.sendgrid.apiKey)}"></div>
+        </div>
+        <div id="panel-mailgun" style="display:${s.emailProvider==='mailgun'?'block':'none'}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="field"><label>Mailgun API key</label><input id="s-mg-key" type="password" class="key-mask" placeholder="key-••••" value="${esc(s.emailProviders.mailgun.apiKey)}"></div>
+            <div class="field"><label>Sending domain</label><input id="s-mg-domain" placeholder="mg.yourdomain.com" value="${esc(s.emailProviders.mailgun.domain)}"></div>
+          </div>
+        </div>
+        <div id="panel-postmark" style="display:${s.emailProvider==='postmark'?'block':'none'}">
+          <div class="field"><label>Postmark server token</label><input id="s-pm-token" type="password" class="key-mask" placeholder="••••••••" value="${esc(s.emailProviders.postmark.serverToken)}"></div>
+        </div>
+        <div id="panel-custom" style="display:${s.emailProvider==='custom'?'block':'none'}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="field"><label>SMTP host</label><input id="s-smtp-host" placeholder="smtp.example.com" value="${esc(s.emailProviders.custom.host)}"></div>
+            <div class="field"><label>Port</label><input id="s-smtp-port" type="number" value="${s.emailProviders.custom.port || 587}"></div>
+            <div class="field"><label>Username</label><input id="s-smtp-user" value="${esc(s.emailProviders.custom.username)}"></div>
+            <div class="field"><label>Password</label><input id="s-smtp-pass" type="password" class="key-mask" value="${esc(s.emailProviders.custom.password)}"></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="s-smtp-secure" ${s.emailProviders.custom.secure ? 'checked' : ''} style="width:16px;height:16px">
+              Use TLS / STARTTLS
+            </label>
+          </div>
+          <div class="field" style="margin-top:12px"><label>From override (optional)</label><input id="s-smtp-from" placeholder="noreply@yourdomain.com" value="${esc(s.emailProviders.custom.fromOverride || '')}"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Optional LLM API Keys -->
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div class="card-title">${icon('key',15)} Optional LLM API Keys</div>
+      <div class="hint" style="margin:8px 0 14px">Bedrock is the primary runtime. These keys are optional fallbacks or for hybrid routing (demo only — stored in localStorage).</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="field"><label>Anthropic API key</label><input id="s-llm-anthropic" type="password" class="key-mask" placeholder="sk-ant-…" value="${esc(s.llmKeys.anthropic)}"></div>
+        <div class="field"><label>OpenAI API key</label><input id="s-llm-openai" type="password" class="key-mask" placeholder="sk-…" value="${esc(s.llmKeys.openai)}"></div>
+        <div class="field"><label>Google AI (Gemini) key</label><input id="s-llm-google" type="password" class="key-mask" placeholder="AIza…" value="${esc(s.llmKeys.google)}"></div>
+        <div class="field"><label>Azure OpenAI key</label><input id="s-llm-azure" type="password" class="key-mask" placeholder="…" value="${esc(s.llmKeys.azureOpenAI)}"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px">
+        <div class="field"><label>Custom endpoint URL</label><input id="s-llm-endpoint" placeholder="https://api.example.com/v1" value="${esc(s.llmKeys.customEndpoint)}"></div>
+        <div class="field"><label>Custom endpoint API key</label><input id="s-llm-customkey" type="password" class="key-mask" placeholder="optional" value="${esc(s.llmKeys.customApiKey)}"></div>
+      </div>
+    </div>
+
+    <!-- Model Routing -->
     <div class="card card-pad" style="margin-bottom:16px">
       <div class="card-title">${icon('cpu',15)} Bedrock Model Routing</div>
-      <div class="kv" style="margin-top:10px"><span>Sequence / Email agents</span><select style="width:220px"><option>Claude 3.7 Sonnet</option><option>Claude 3.5 Sonnet</option></select></div>
-      <div class="kv"><span>LeadGen agent</span><select style="width:220px"><option>Claude 3.5 Sonnet</option><option>Claude 3.7 Sonnet</option></select></div>
-      <div class="kv"><span>Critique + Loop agents</span><select style="width:220px"><option>Claude 3.5 Haiku (fast/cheap)</option><option>Claude 3.5 Sonnet</option></select></div>
+      <div class="kv" style="margin-top:10px"><span>Sequence / Email agents</span><select id="s-model-seq" style="width:240px"><option ${s.modelRouting.sequenceEmail.includes('3.7')?'selected':''}>Claude 3.7 Sonnet</option><option ${s.modelRouting.sequenceEmail.includes('3.5')&&!s.modelRouting.sequenceEmail.includes('Haiku')?'selected':''}>Claude 3.5 Sonnet</option></select></div>
+      <div class="kv"><span>LeadGen agent</span><select id="s-model-lead" style="width:240px"><option ${s.modelRouting.leadgen.includes('3.5')?'selected':''}>Claude 3.5 Sonnet</option><option>Claude 3.7 Sonnet</option></select></div>
+      <div class="kv"><span>Critique + Loop agents</span><select id="s-model-crit" style="width:240px"><option ${s.modelRouting.critiqueLoop.includes('Haiku')?'selected':''}>Claude 3.5 Haiku (fast/cheap)</option><option>Claude 3.5 Sonnet</option></select></div>
     </div>
+
+    <!-- Delivery -->
     <div class="card card-pad" style="margin-bottom:16px">
-      <div class="card-title">${icon('send',15)} Delivery (Amazon SES)</div>
-      <div class="kv" style="margin-top:10px"><span>Daily sending quota</span><b>50,000 / day</b></div>
-      <div class="kv"><span>Throttle rate</span><b>14 emails / second</b></div>
-      <div class="kv"><span>Reputation score</span><b style="color:var(--teal)">98 / 100 — Healthy</b></div>
+      <div class="card-title">${icon('send',15)} Delivery limits</div>
+      <div class="kv" style="margin-top:10px"><span>Daily sending quota</span><b id="s-quota-display">${s.delivery.dailyQuota.toLocaleString()} / day</b></div>
+      <div class="kv"><span>Throttle rate</span><b>${s.delivery.throttleRate} emails / second</b></div>
+      <div class="kv"><span>Reputation score</span><b style="color:var(--teal)">${s.delivery.reputation} / 100 — Healthy</b></div>
     </div>
+
+    <!-- Danger -->
     <div class="card card-pad" style="border-color:rgba(239,68,68,.3)">
       <div class="card-title" style="color:var(--red)">${icon('trash',15)} Danger zone</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
-        <span style="font-size:12.5px;color:var(--text-2)">Reset all demo data (campaigns, leads, runs)</span>
+        <span style="font-size:12.5px;color:var(--text-2)">Reset all demo data (campaigns, leads, runs, settings)</span>
         <button class="btn btn-danger" onclick="Backend.resetDemo()">Reset demo</button>
       </div>
     </div>
   </div>`;
+
+  // Provider selection
+  let selectedProvider = s.emailProvider;
+  document.querySelectorAll('.provider-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.provider-card').forEach(c => c.classList.remove('on'));
+      card.classList.add('on');
+      selectedProvider = card.dataset.provider;
+      ['ses','sendgrid','mailgun','postmark','custom'].forEach(id => {
+        const panel = document.getElementById('panel-' + id);
+        if (panel) panel.style.display = id === selectedProvider ? 'block' : 'none';
+      });
+    });
+  });
+
+  document.getElementById('settings-save').onclick = async () => {
+    const regionVal = document.getElementById('s-region').value.split(' ')[0];
+    const patch = {
+      workspaceName: document.getElementById('s-workspace').value.trim() || 'MarMail Growth',
+      defaultSender: document.getElementById('s-sender').value.trim() || 'jordan@marmail.ai',
+      region: regionVal,
+      dbUrl: document.getElementById('s-dburl').value.trim(),
+      emailProvider: selectedProvider,
+      emailProviders: {
+        ses: {
+          enabled: selectedProvider === 'ses',
+          region: document.getElementById('s-ses-region')?.value || 'us-east-1',
+          configurationSet: document.getElementById('s-ses-config')?.value || 'marmail-outbound'
+        },
+        sendgrid: {
+          enabled: selectedProvider === 'sendgrid',
+          apiKey: document.getElementById('s-sg-key')?.value || ''
+        },
+        mailgun: {
+          enabled: selectedProvider === 'mailgun',
+          apiKey: document.getElementById('s-mg-key')?.value || '',
+          domain: document.getElementById('s-mg-domain')?.value || ''
+        },
+        postmark: {
+          enabled: selectedProvider === 'postmark',
+          serverToken: document.getElementById('s-pm-token')?.value || ''
+        },
+        custom: {
+          enabled: selectedProvider === 'custom',
+          host: document.getElementById('s-smtp-host')?.value || '',
+          port: parseInt(document.getElementById('s-smtp-port')?.value || '587', 10),
+          username: document.getElementById('s-smtp-user')?.value || '',
+          password: document.getElementById('s-smtp-pass')?.value || '',
+          secure: document.getElementById('s-smtp-secure')?.checked ?? true,
+          fromOverride: document.getElementById('s-smtp-from')?.value || ''
+        }
+      },
+      llmKeys: {
+        anthropic: document.getElementById('s-llm-anthropic').value,
+        openai: document.getElementById('s-llm-openai').value,
+        google: document.getElementById('s-llm-google').value,
+        azureOpenAI: document.getElementById('s-llm-azure').value,
+        customEndpoint: document.getElementById('s-llm-endpoint').value,
+        customApiKey: document.getElementById('s-llm-customkey').value
+      },
+      modelRouting: {
+        sequenceEmail: document.getElementById('s-model-seq').value,
+        leadgen: document.getElementById('s-model-lead').value,
+        critiqueLoop: document.getElementById('s-model-crit').value
+      }
+    };
+    await Backend.updateSettings(patch);
+    toast('Settings saved — provider & keys stored in demo DB', 'ok');
+  };
 });
 
 /* ============ BOOT ============ */
-renderSidebar(); renderHeader(); renderFooter();
+renderSidebar();
+renderHeader();
+renderFooter();
 if (!location.hash) location.hash = '#/dashboard';
 router();
 </script>
