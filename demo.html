@@ -291,7 +291,7 @@ const Backend = (() => {
         workspaceName: 'MarMail Growth',
         defaultSender: 'jordan@marmail.ai',
         region: 'us-east-1',
-        dbUrl: 'postgresql://demo:demo@cockroachdb-cluster-demo.marmail.aws:26257/marmail?sslmode=verify-full',
+        dbUrl: 'https://your-db-url',
         emailProvider: 'ses',
         emailProviders: {
           ses: { enabled: true, region: 'us-east-1', configurationSet: 'marmail-outbound' },
